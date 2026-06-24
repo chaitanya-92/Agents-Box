@@ -9,4 +9,4 @@ pnpm-lock.yaml
 package-lock.json
 yarn.lock
 prisma/dev.db
-
+*.tsbuildinfo

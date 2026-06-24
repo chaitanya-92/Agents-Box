@@ -1,7 +1,7 @@
 import type { NextFunction, Request, Response } from "express";
-import { SubscriptionStatus } from "@prisma/client";
 import { StatusCodes } from "http-status-codes";
 import { failure } from "@/lib/api-response";
+import { SUBSCRIPTION_STATUS } from "@/lib/domain-types";
 import { prisma } from "@/lib/prisma";
 
 export async function requireActiveSubscription(req: Request, res: Response, next: NextFunction) {
@@ -12,7 +12,7 @@ export async function requireActiveSubscription(req: Request, res: Response, nex
   const subscription = await prisma.subscription.findFirst({
     where: {
       userId: req.user.id,
-      status: SubscriptionStatus.ACTIVE
+      status: SUBSCRIPTION_STATUS.ACTIVE
     },
     orderBy: {
       updatedAt: "desc"
@@ -25,4 +25,3 @@ export async function requireActiveSubscription(req: Request, res: Response, nex
 
   return next();
 }
-

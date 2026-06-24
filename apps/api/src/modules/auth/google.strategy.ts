@@ -1,17 +1,23 @@
 import passport from "passport";
+import type { Profile, VerifyCallback } from "passport-google-oauth20";
 import { Strategy as GoogleStrategy } from "passport-google-oauth20";
 import { env } from "@/config/env";
 import { prisma } from "@/lib/prisma";
+import { isGoogleOAuthConfigured } from "@/lib/oauth";
 
-if (env.GOOGLE_CLIENT_ID && env.GOOGLE_CLIENT_SECRET && env.GOOGLE_CALLBACK_URL) {
+if (isGoogleOAuthConfigured()) {
+  const clientID = env.GOOGLE_CLIENT_ID as string;
+  const clientSecret = env.GOOGLE_CLIENT_SECRET as string;
+  const callbackURL = env.GOOGLE_CALLBACK_URL as string;
+
   passport.use(
     new GoogleStrategy(
       {
-        clientID: env.GOOGLE_CLIENT_ID,
-        clientSecret: env.GOOGLE_CLIENT_SECRET,
-        callbackURL: env.GOOGLE_CALLBACK_URL
+        clientID,
+        clientSecret,
+        callbackURL
       },
-      async (_accessToken, _refreshToken, profile, done) => {
+      async (_accessToken: string, _refreshToken: string, profile: Profile, done: VerifyCallback) => {
         try {
           const email = profile.emails?.[0]?.value;
 
@@ -43,4 +49,3 @@ if (env.GOOGLE_CLIENT_ID && env.GOOGLE_CLIENT_SECRET && env.GOOGLE_CALLBACK_URL)
 }
 
 export { passport };
-

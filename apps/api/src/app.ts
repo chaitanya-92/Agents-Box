@@ -3,6 +3,7 @@ import cors from "cors";
 import express from "express";
 import helmet from "helmet";
 import rateLimit from "express-rate-limit";
+import type { Request } from "express";
 import { env } from "@/config/env";
 import { errorHandler } from "@/middleware/error-handler";
 import { notFoundHandler } from "@/middleware/not-found";
@@ -31,7 +32,7 @@ export function createApp() {
     express.json({
       limit: "2mb",
       verify: (req, _res, buffer) => {
-        req.rawBody = buffer.toString();
+        (req as Request).rawBody = buffer.toString();
       }
     })
   );

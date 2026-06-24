@@ -116,6 +116,10 @@ export async function googleCallback(req: Request, res: Response) {
   const redirectUrl = new URL("/dashboard", env.APP_URL);
   redirectUrl.searchParams.set("accessToken", tokens.accessToken);
   redirectUrl.searchParams.set("refreshToken", tokens.refreshToken);
+  redirectUrl.searchParams.set("id", oauthUser.id);
+  redirectUrl.searchParams.set("name", oauthUser.name);
+  redirectUrl.searchParams.set("email", oauthUser.email);
+  redirectUrl.searchParams.set("role", oauthUser.role);
 
   return res.redirect(redirectUrl.toString());
 }

@@ -119,6 +119,8 @@ function RegisterFields() {
 }
 
 export function AuthForm({ variant }: { variant: AuthVariant }) {
+  const googleHref = `${publicEnv.apiUrl}/auth/google`;
+
   return (
     <div className="pixel-panel mx-auto w-full max-w-lg p-6 sm:p-8">
       <p className="section-label">{variant === "login" ? "Welcome back" : "Create your workspace"}</p>
@@ -133,12 +135,22 @@ export function AuthForm({ variant }: { variant: AuthVariant }) {
 
       {variant === "login" ? <LoginFields /> : <RegisterFields />}
 
-      <a
-        href={`${publicEnv.apiUrl}/auth/google`}
-        className="mt-4 flex h-11 w-full items-center justify-center border border-white/15 bg-white/[0.03] text-sm text-white/80 transition hover:bg-white/[0.06]"
-      >
-        Continue with Google
-      </a>
+      {publicEnv.googleAuthEnabled ? (
+        <a
+          href={googleHref}
+          className="mt-4 flex h-11 w-full items-center justify-center border border-white/15 bg-white/[0.03] text-sm text-white/80 transition hover:bg-white/[0.06]"
+        >
+          Continue with Google
+        </a>
+      ) : (
+        <button
+          type="button"
+          disabled
+          className="mt-4 flex h-11 w-full cursor-not-allowed items-center justify-center border border-white/10 bg-white/[0.02] text-sm text-white/35"
+        >
+          Google login not configured
+        </button>
+      )}
 
       <p className="mt-6 text-sm text-white/55">
         {variant === "login" ? "Need an account?" : "Already have an account?"}{" "}

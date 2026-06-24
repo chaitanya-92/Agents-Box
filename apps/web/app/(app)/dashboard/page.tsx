@@ -1,8 +1,13 @@
+import { Suspense } from "react";
 import { agentCatalog, pricingPlans } from "@agentverse/config";
+import { OauthSessionSync } from "@/components/auth/oauth-session-sync";
 
 export default function DashboardPage() {
   return (
     <main className="mx-auto min-h-screen max-w-7xl px-4 py-12 sm:px-6 lg:px-8">
+      <Suspense fallback={null}>
+        <OauthSessionSync />
+      </Suspense>
       <div className="mb-10 flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
         <div>
           <p className="section-label">Workspace</p>
@@ -66,4 +71,3 @@ export default function DashboardPage() {
     </main>
   );
 }
-

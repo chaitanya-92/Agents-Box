@@ -1,8 +1,8 @@
 import crypto from "node:crypto";
 import Razorpay from "razorpay";
-import { PaymentStatus, SubscriptionStatus } from "@prisma/client";
 import { pricingPlans } from "@agentverse/config";
 import { env } from "@/config/env";
+import { PAYMENT_STATUS, SUBSCRIPTION_STATUS } from "@/lib/domain-types";
 import { prisma } from "@/lib/prisma";
 
 const razorpay = new Razorpay({
@@ -25,10 +25,8 @@ export async function createRazorpayOrder(userId: string, amount: number, planId
       userId,
       amount,
       razorpayOrderId: order.id,
-      status: PaymentStatus.CREATED,
-      metadata: {
-        planId
-      }
+      status: PAYMENT_STATUS.CREATED,
+      metadata: JSON.stringify({ planId })
     }
   });
 
@@ -65,7 +63,7 @@ export async function verifyAndCapturePayment(input: {
     data: {
       razorpayPaymentId: input.razorpayPaymentId,
       razorpaySignature: input.razorpaySignature,
-      status: PaymentStatus.CAPTURED
+      status: PAYMENT_STATUS.CAPTURED
     }
   });
 
@@ -74,7 +72,7 @@ export async function verifyAndCapturePayment(input: {
       razorpaySubscriptionId: input.razorpayOrderId
     },
     update: {
-      status: SubscriptionStatus.ACTIVE,
+      status: SUBSCRIPTION_STATUS.ACTIVE,
       planId: input.planId,
       currentPeriodStart: new Date(),
       currentPeriodEnd: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000)
@@ -82,7 +80,7 @@ export async function verifyAndCapturePayment(input: {
     create: {
       userId: input.userId,
       planId: input.planId,
-      status: SubscriptionStatus.ACTIVE,
+      status: SUBSCRIPTION_STATUS.ACTIVE,
       razorpaySubscriptionId: input.razorpayOrderId,
       currentPeriodStart: new Date(),
       currentPeriodEnd: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000)
@@ -111,7 +109,7 @@ export async function processWebhookEvent(event: Record<string, unknown>) {
       where: { razorpayOrderId: paymentEntity.order_id },
       data: {
         razorpayPaymentId: paymentEntity.id,
-        status: paymentEntity.status === "captured" ? PaymentStatus.CAPTURED : PaymentStatus.FAILED
+        status: paymentEntity.status === "captured" ? PAYMENT_STATUS.CAPTURED : PAYMENT_STATUS.FAILED
       }
     });
   }
@@ -122,10 +120,10 @@ export async function processWebhookEvent(event: Record<string, unknown>) {
       data: {
         status:
           subscriptionEntity.status === "active"
-            ? SubscriptionStatus.ACTIVE
+            ? SUBSCRIPTION_STATUS.ACTIVE
             : subscriptionEntity.status === "cancelled"
-              ? SubscriptionStatus.CANCELED
-              : SubscriptionStatus.PAST_DUE
+              ? SUBSCRIPTION_STATUS.CANCELED
+              : SUBSCRIPTION_STATUS.PAST_DUE
       }
     });
   }

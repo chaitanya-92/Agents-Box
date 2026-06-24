@@ -1,0 +1,41 @@
+services:
+  - type: web
+    name: agentverse-api
+    runtime: docker
+    dockerfilePath: ./apps/api/Dockerfile
+    dockerContext: .
+    plan: free
+    region: singapore
+    healthCheckPath: /api/v1/health
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: PORT
+        value: 8080
+      # Set these manually in the Render dashboard
+      - key: DATABASE_URL
+        sync: false
+      - key: DIRECT_URL
+        sync: false
+      - key: JWT_ACCESS_SECRET
+        generateValue: true
+      - key: JWT_REFRESH_SECRET
+        generateValue: true
+      - key: GOOGLE_CLIENT_ID
+        sync: false
+      - key: GOOGLE_CLIENT_SECRET
+        sync: false
+      - key: GOOGLE_CALLBACK_URL
+        value: https://agentverse-api.onrender.com/api/v1/auth/google/callback
+      - key: RAZORPAY_KEY_ID
+        sync: false
+      - key: RAZORPAY_KEY_SECRET
+        sync: false
+      - key: RAZORPAY_WEBHOOK_SECRET
+        sync: false
+      - key: APP_URL
+        value: https://agentverse-ai-web.vercel.app
+      - key: API_URL
+        value: https://agentverse-api.onrender.com
+      - key: CORS_ORIGIN
+        value: https://agentverse-ai-web.vercel.app

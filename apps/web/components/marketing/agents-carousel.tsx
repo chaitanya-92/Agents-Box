@@ -12,6 +12,10 @@ export function AgentsCarousel() {
   const [activeIndex, setActiveIndex] = useState(0);
   const activeAgent = featuredAgents[activeIndex];
 
+  if (!activeAgent) {
+    return null;
+  }
+
   const next = () => setActiveIndex((current) => (current + 1) % featuredAgents.length);
   const prev = () => setActiveIndex((current) => (current - 1 + featuredAgents.length) % featuredAgents.length);
 
@@ -149,4 +153,3 @@ export function AgentsCarousel() {
     </section>
   );
 }
-

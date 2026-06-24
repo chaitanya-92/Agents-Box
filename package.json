@@ -7,9 +7,9 @@
     "packages/*"
   ],
   "scripts": {
-    "dev:web": "npm run dev --workspace @agentverse/web",
-    "dev:api": "npm run dev --workspace @agentverse/api",
-    "build": "npm run build --workspaces",
+    "dev:web": "npm run build --workspace @agentverse/config && npm run dev --workspace @agentverse/web",
+    "dev:api": "npm run build --workspace @agentverse/config && npm run dev --workspace @agentverse/api",
+    "build": "npm run build --workspace @agentverse/config && npm run build --workspace @agentverse/api && npm run build --workspace @agentverse/web",
     "lint": "npm run lint --workspaces",
     "typecheck": "npm run typecheck --workspaces"
   }

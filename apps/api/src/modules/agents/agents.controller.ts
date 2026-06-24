@@ -11,6 +11,11 @@ export async function listAgents(_req: Request, res: Response) {
 
 export async function invokeAgent(req: Request, res: Response) {
   const { agentId } = req.params;
+
+  if (typeof agentId !== "string") {
+    return res.status(StatusCodes.BAD_REQUEST).json({ success: false, message: "Invalid agent id" });
+  }
+
   const agent = getAgentById(agentId);
 
   if (!req.user) {
@@ -25,10 +30,10 @@ export async function invokeAgent(req: Request, res: Response) {
     data: {
       userId: req.user.id,
       agentId: agent.id,
-      metadata: {
+      metadata: JSON.stringify({
         source: "api",
         invokedAt: new Date().toISOString()
-      }
+      })
     }
   });
 
@@ -39,4 +44,3 @@ export async function invokeAgent(req: Request, res: Response) {
     })
   );
 }
-

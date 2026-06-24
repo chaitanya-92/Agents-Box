@@ -1,7 +1,7 @@
 import type { NextFunction, Request, Response } from "express";
-import type { UserRole } from "@prisma/client";
 import { StatusCodes } from "http-status-codes";
 import { failure } from "@/lib/api-response";
+import type { UserRole } from "@/lib/domain-types";
 import { verifyAccessToken } from "@/lib/jwt";
 
 export function authenticate(req: Request, res: Response, next: NextFunction) {

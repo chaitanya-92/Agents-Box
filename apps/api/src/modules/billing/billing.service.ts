@@ -1,0 +1,132 @@
+import crypto from "node:crypto";
+import Razorpay from "razorpay";
+import { PaymentStatus, SubscriptionStatus } from "@prisma/client";
+import { pricingPlans } from "@agentverse/config";
+import { env } from "@/config/env";
+import { prisma } from "@/lib/prisma";
+
+const razorpay = new Razorpay({
+  key_id: env.RAZORPAY_KEY_ID,
+  key_secret: env.RAZORPAY_KEY_SECRET
+});
+
+export async function createRazorpayOrder(userId: string, amount: number, planId: string) {
+  const order = await razorpay.orders.create({
+    amount,
+    currency: "INR",
+    receipt: `agentverse_${userId}_${Date.now()}`,
+    notes: {
+      planId
+    }
+  });
+
+  await prisma.payment.create({
+    data: {
+      userId,
+      amount,
+      razorpayOrderId: order.id,
+      status: PaymentStatus.CREATED,
+      metadata: {
+        planId
+      }
+    }
+  });
+
+  return order;
+}
+
+export function getPlanById(planId: string) {
+  return pricingPlans.find((plan) => plan.id === planId);
+}
+
+export async function verifyAndCapturePayment(input: {
+  userId: string;
+  razorpayOrderId: string;
+  razorpayPaymentId: string;
+  razorpaySignature: string;
+  planId: string;
+}) {
+  const expectedSignature = crypto
+    .createHmac("sha256", env.RAZORPAY_KEY_SECRET)
+    .update(`${input.razorpayOrderId}|${input.razorpayPaymentId}`)
+    .digest("hex");
+
+  if (expectedSignature !== input.razorpaySignature) {
+    throw new Error("Payment signature verification failed");
+  }
+
+  const matchedPlan = pricingPlans.find((plan) => plan.id === input.planId);
+  if (!matchedPlan) {
+    throw new Error("Invalid plan selected");
+  }
+
+  await prisma.payment.update({
+    where: { razorpayOrderId: input.razorpayOrderId },
+    data: {
+      razorpayPaymentId: input.razorpayPaymentId,
+      razorpaySignature: input.razorpaySignature,
+      status: PaymentStatus.CAPTURED
+    }
+  });
+
+  const subscription = await prisma.subscription.upsert({
+    where: {
+      razorpaySubscriptionId: input.razorpayOrderId
+    },
+    update: {
+      status: SubscriptionStatus.ACTIVE,
+      planId: input.planId,
+      currentPeriodStart: new Date(),
+      currentPeriodEnd: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000)
+    },
+    create: {
+      userId: input.userId,
+      planId: input.planId,
+      status: SubscriptionStatus.ACTIVE,
+      razorpaySubscriptionId: input.razorpayOrderId,
+      currentPeriodStart: new Date(),
+      currentPeriodEnd: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000)
+    }
+  });
+
+  return subscription;
+}
+
+export function verifyWebhookSignature(body: string, signature: string) {
+  const expectedSignature = crypto
+    .createHmac("sha256", env.RAZORPAY_WEBHOOK_SECRET)
+    .update(body)
+    .digest("hex");
+
+  return expectedSignature === signature;
+}
+
+export async function processWebhookEvent(event: Record<string, unknown>) {
+  const payload = event.payload as Record<string, any> | undefined;
+  const paymentEntity = payload?.payment?.entity;
+  const subscriptionEntity = payload?.subscription?.entity;
+
+  if (paymentEntity?.order_id) {
+    await prisma.payment.updateMany({
+      where: { razorpayOrderId: paymentEntity.order_id },
+      data: {
+        razorpayPaymentId: paymentEntity.id,
+        status: paymentEntity.status === "captured" ? PaymentStatus.CAPTURED : PaymentStatus.FAILED
+      }
+    });
+  }
+
+  if (subscriptionEntity?.id) {
+    await prisma.subscription.updateMany({
+      where: { razorpaySubscriptionId: subscriptionEntity.id },
+      data: {
+        status:
+          subscriptionEntity.status === "active"
+            ? SubscriptionStatus.ACTIVE
+            : subscriptionEntity.status === "cancelled"
+              ? SubscriptionStatus.CANCELED
+              : SubscriptionStatus.PAST_DUE
+      }
+    });
+  }
+}

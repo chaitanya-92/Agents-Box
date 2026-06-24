@@ -1,0 +1,87 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum UserRole {
+  USER
+  ADMIN
+}
+
+enum SubscriptionStatus {
+  PENDING
+  ACTIVE
+  PAST_DUE
+  CANCELED
+  EXPIRED
+}
+
+enum PaymentStatus {
+  CREATED
+  CAPTURED
+  FAILED
+  REFUNDED
+}
+
+model User {
+  id              String          @id @default(cuid())
+  name            String
+  email           String          @unique
+  passwordHash    String?
+  avatarUrl       String?
+  role            UserRole        @default(USER)
+  googleId        String?         @unique
+  refreshToken    String?
+  createdAt       DateTime        @default(now())
+  updatedAt       DateTime        @updatedAt
+  subscriptions   Subscription[]
+  payments        Payment[]
+  usageLogs       AgentUsage[]
+}
+
+model Subscription {
+  id                    String             @id @default(cuid())
+  userId                String
+  planId                String
+  status                SubscriptionStatus @default(PENDING)
+  razorpayCustomerId    String?
+  razorpaySubscriptionId String?           @unique
+  currentPeriodStart    DateTime?
+  currentPeriodEnd      DateTime?
+  createdAt             DateTime           @default(now())
+  updatedAt             DateTime           @updatedAt
+  user                  User               @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model Payment {
+  id                String        @id @default(cuid())
+  userId            String
+  subscriptionId    String?
+  razorpayOrderId   String?       @unique
+  razorpayPaymentId String?       @unique
+  razorpaySignature String?
+  amount            Int
+  currency          String        @default("INR")
+  status            PaymentStatus @default(CREATED)
+  metadata          Json?
+  createdAt         DateTime      @default(now())
+  updatedAt         DateTime      @updatedAt
+  user              User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model AgentUsage {
+  id         String   @id @default(cuid())
+  userId     String
+  agentId    String
+  units      Int      @default(1)
+  metadata   Json?
+  createdAt  DateTime @default(now())
+  user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, agentId])
+}
+

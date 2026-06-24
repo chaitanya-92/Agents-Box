@@ -1,0 +1,35 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  color-scheme: dark;
+}
+
+html {
+  scroll-behavior: smooth;
+}
+
+body {
+  @apply bg-background text-foreground antialiased;
+  background-image:
+    radial-gradient(circle at top, rgba(153, 211, 255, 0.08), transparent 34%),
+    linear-gradient(180deg, rgba(8, 10, 12, 0.96), rgba(8, 10, 12, 1)),
+    linear-gradient(rgba(255,255,255,0.04) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(255,255,255,0.04) 1px, transparent 1px);
+  background-size: auto, auto, 32px 32px, 32px 32px;
+}
+
+::selection {
+  background: rgba(145, 209, 255, 0.25);
+}
+
+.pixel-panel {
+  @apply border border-border bg-white/[0.03] backdrop-blur-sm;
+  box-shadow: 0 0 0 1px rgba(255,255,255,0.03), 0 24px 60px rgba(0,0,0,0.35);
+}
+
+.section-label {
+  @apply font-mono text-[10px] uppercase tracking-[0.35em] text-sky-100/70;
+}
+

@@ -1,0 +1,34 @@
+import type { Metadata } from "next";
+import { Press_Start_2P, Space_Grotesk } from "next/font/google";
+import type { ReactNode } from "react";
+import "./globals.css";
+
+const pixelFont = Press_Start_2P({
+  variable: "--font-pixel",
+  subsets: ["latin"],
+  weight: "400"
+});
+
+const bodyFont = Space_Grotesk({
+  variable: "--font-body",
+  subsets: ["latin"]
+});
+
+export const metadata: Metadata = {
+  title: "AgentVerse AI",
+  description: "One Platform. Unlimited AI Agents."
+};
+
+export default function RootLayout({
+  children
+}: Readonly<{
+  children: ReactNode;
+}>) {
+  return (
+    <html lang="en">
+      <body className={`${pixelFont.variable} ${bodyFont.variable} font-[var(--font-body)]`}>
+        {children}
+      </body>
+    </html>
+  );
+}

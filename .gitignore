@@ -10,3 +10,5 @@ package-lock.json
 yarn.lock
 prisma/dev.db
 *.tsbuildinfo
+.vercel
+packages/*/dist

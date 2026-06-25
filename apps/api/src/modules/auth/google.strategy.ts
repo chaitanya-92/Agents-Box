@@ -1,6 +1,7 @@
 import passport from "passport";
 import type { Profile, VerifyCallback } from "passport-google-oauth20";
 import { Strategy as GoogleStrategy } from "passport-google-oauth20";
+import type { User } from "@prisma/client";
 import { env } from "@/config/env";
 import { prisma } from "@/lib/prisma";
 import { isGoogleOAuthConfigured } from "@/lib/oauth";
@@ -39,7 +40,7 @@ if (isGoogleOAuthConfigured()) {
             }
           });
 
-          return done(null, user);
+          return done(null, user as unknown as User);
         } catch (error) {
           return done(error as Error);
         }

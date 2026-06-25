@@ -37,9 +37,9 @@ const run = (cmd) => execSync(cmd, { cwd: DIR, stdio: "inherit" });
 async function main() {
   // ── 1. Commit & push ────────────────────────────────────────────────────────
   console.log("📦 Committing and pushing...");
-  run("git add -f Dockerfile do-it.mjs .gitignore .env.deploy 2>/dev/null || true");
+  run("git add -f Dockerfile do-it.mjs .gitignore apps/api/src/modules/auth/google.strategy.ts 2>/dev/null || true");
   try {
-    run(`git commit -m "fix: node:22-slim Dockerfile for Prisma/OpenSSL compatibility"`);
+    run(`git commit -m "fix: TS type error in google.strategy (UserRole cast) + Dockerfile debian slim"`);
     run("git push origin main");
     console.log("   ✅ Pushed\n");
   } catch { console.log("   Already up to date\n"); }

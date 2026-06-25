@@ -1,0 +1,15 @@
+node_modules
+.next
+apps/api/dist
+packages/config/dist
+.env
+.env.local
+.git
+*.md
+deploy-render.mjs
+fix-render-deploy.mjs
+render-deploy.mjs
+render-logs.mjs
+set-db-env.mjs
+do-it.mjs
+go.sh

@@ -1,26 +1,28 @@
-FROM node:22-alpine AS base
+FROM node:22-slim
 WORKDIR /app
 
-FROM base AS deps
-COPY package.json package.json
-COPY apps/api/package.json apps/api/package.json
-COPY packages/config/package.json packages/config/package.json
-RUN npm install --workspaces
+# Prisma requires openssl on debian slim
+RUN apt-get update -y && apt-get install -y openssl ca-certificates && rm -rf /var/lib/apt/lists/*
 
-FROM deps AS build
+# Copy all source
 COPY . .
-RUN npx prisma generate
-RUN npm run build --workspace @agentverse/config
-RUN npm run build --workspace @agentverse/api
 
-FROM base AS runner
+# Install all deps (include devDeps for build tools: tsc, tsc-alias, prisma)
+RUN npm install --include=dev
+
+# Build config package first (API imports from it)
+RUN node_modules/.bin/tsc -p packages/config/tsconfig.json
+
+# Generate Prisma client
+RUN node_modules/.bin/prisma generate
+
+# Build API
+RUN node_modules/.bin/tsc -p apps/api/tsconfig.json
+RUN node_modules/.bin/tsc-alias -p apps/api/tsconfig.json
+
+# Prune devDeps for smaller image
+RUN npm prune --production
+
 ENV NODE_ENV=production
-WORKDIR /app
-COPY --from=build /app/node_modules ./node_modules
-COPY --from=build /app/apps/api/dist ./apps/api/dist
-COPY --from=build /app/apps/api/package.json ./apps/api/package.json
-COPY --from=build /app/packages/config/dist ./packages/config/dist
-COPY --from=build /app/packages/config/package.json ./packages/config/package.json
-COPY --from=build /app/prisma ./prisma
 EXPOSE 8080
 CMD ["node", "apps/api/dist/server.js"]

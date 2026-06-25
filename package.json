@@ -10,6 +10,7 @@
     "dev:web": "npm run build --workspace @agentverse/config && npm run dev --workspace @agentverse/web",
     "dev:api": "npm run build --workspace @agentverse/config && npm run dev --workspace @agentverse/api",
     "build": "npm run build --workspace @agentverse/config && npm run build --workspace @agentverse/api && npm run build --workspace @agentverse/web",
+    "build:api": "npm run build --workspace @agentverse/config && npm run build --workspace @agentverse/api",
     "lint": "npm run lint --workspaces",
     "typecheck": "npm run typecheck --workspaces"
   }

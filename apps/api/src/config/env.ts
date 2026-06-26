@@ -1,10 +1,29 @@
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
+import { randomBytes } from "node:crypto";
 import dotenv from "dotenv";
 import { z } from "zod";
 
 const currentDir = dirname(fileURLToPath(import.meta.url));
 dotenv.config({ path: resolve(currentDir, "../../../../.env") });
+
+// Auto-generate secrets if not provided (ephemeral — tokens invalidate on restart,
+// but the server will start. Set these as persistent env vars in production.)
+const autoSecret = (key: string, len = 64) => {
+  if (!process.env[key] || (process.env[key]?.length ?? 0) < 32) {
+    const val = randomBytes(len).toString("hex");
+    process.env[key] = val;
+    console.warn(`[env] ${key} not set or too short — generated ephemeral value. Set it in Render env vars for stable JWTs.`);
+  }
+};
+
+autoSecret("JWT_ACCESS_SECRET");
+autoSecret("JWT_REFRESH_SECRET");
+
+if (!process.env["RAZORPAY_WEBHOOK_SECRET"]) {
+  process.env["RAZORPAY_WEBHOOK_SECRET"] = randomBytes(24).toString("hex");
+  console.warn("[env] RAZORPAY_WEBHOOK_SECRET not set — generated ephemeral value.");
+}
 
 const envSchema = z.object({
   NODE_ENV: z.enum(["development", "test", "production"]).default("development"),

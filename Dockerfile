@@ -1,20 +1,20 @@
 FROM node:22-slim
 WORKDIR /app
 
-# Prisma needs openssl on debian slim
 RUN apt-get update -y && apt-get install -y openssl ca-certificates && rm -rf /var/lib/apt/lists/*
 
-# Copy all source
 COPY . .
 
-# Install all deps (include dev for esbuild, prisma, typescript)
 RUN npm install --include=dev
 
-# Generate Prisma client
+# 1. Build workspace config package (API imports @agentverse/config at runtime)
+RUN node_modules/.bin/tsc -p packages/config/tsconfig.json
+
+# 2. Generate Prisma client
 RUN node_modules/.bin/prisma generate
 
-# Bundle API into single file — esbuild resolves @/ path aliases via tsconfig,
-# --packages=external keeps node_modules as runtime deps (not inlined)
+# 3. Bundle API — esbuild resolves @/ aliases, externalises node_modules
+#    @agentverse/config is in node_modules as a symlink → packages/config/dist (built above)
 RUN node_modules/.bin/esbuild apps/api/src/server.ts \
     --bundle \
     --packages=external \
@@ -23,7 +23,6 @@ RUN node_modules/.bin/esbuild apps/api/src/server.ts \
     --outfile=apps/api/dist/server.js \
     --tsconfig=apps/api/tsconfig.json
 
-# Prune devDeps for smaller image
 RUN npm prune --production
 
 ENV NODE_ENV=production

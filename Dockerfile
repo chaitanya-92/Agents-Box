@@ -23,4 +23,4 @@ RUN node_modules/.bin/esbuild apps/api/src/server.ts \
 
 ENV NODE_ENV=production
 EXPOSE 8080
-CMD ["node", "apps/api/dist/server.cjs"]
+CMD ["node", "apps/api/start.cjs"]

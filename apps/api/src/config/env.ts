@@ -1,46 +1,38 @@
-import { dirname, resolve } from "node:path";
-import { fileURLToPath } from "node:url";
 import { randomBytes } from "node:crypto";
 import dotenv from "dotenv";
 import { z } from "zod";
 
-const currentDir = dirname(fileURLToPath(import.meta.url));
-dotenv.config({ path: resolve(currentDir, "../../../../.env") });
+// Load .env if present (dev only; Render injects vars directly)
+dotenv.config();
 
-// Auto-generate secrets if not provided (ephemeral — tokens invalidate on restart,
-// but the server will start. Set these as persistent env vars in production.)
-const autoSecret = (key: string, len = 64) => {
-  if (!process.env[key] || (process.env[key]?.length ?? 0) < 32) {
-    const val = randomBytes(len).toString("hex");
-    process.env[key] = val;
-    console.warn(`[env] ${key} not set or too short — generated ephemeral value. Set it in Render env vars for stable JWTs.`);
+// Ensure secrets exist with minimum length
+const ensureSecret = (key: string, bytes = 32) => {
+  if (!process.env[key] || process.env[key]!.length < 32) {
+    process.env[key] = randomBytes(bytes).toString("hex");
   }
 };
-
-autoSecret("JWT_ACCESS_SECRET");
-autoSecret("JWT_REFRESH_SECRET");
-
+ensureSecret("JWT_ACCESS_SECRET");
+ensureSecret("JWT_REFRESH_SECRET");
 if (!process.env["RAZORPAY_WEBHOOK_SECRET"]) {
   process.env["RAZORPAY_WEBHOOK_SECRET"] = randomBytes(24).toString("hex");
-  console.warn("[env] RAZORPAY_WEBHOOK_SECRET not set — generated ephemeral value.");
 }
 
 const envSchema = z.object({
-  NODE_ENV: z.enum(["development", "test", "production"]).default("development"),
-  PORT: z.coerce.number().default(8080),
-  DATABASE_URL: z.string().min(1),
-  DIRECT_URL: z.string().optional(),
-  JWT_ACCESS_SECRET: z.string().min(32),
-  JWT_REFRESH_SECRET: z.string().min(32),
-  GOOGLE_CLIENT_ID: z.string().optional(),
-  GOOGLE_CLIENT_SECRET: z.string().optional(),
-  GOOGLE_CALLBACK_URL: z.string().optional(),
-  RAZORPAY_KEY_ID: z.string().min(1),
-  RAZORPAY_KEY_SECRET: z.string().min(1),
-  RAZORPAY_WEBHOOK_SECRET: z.string().min(1),
-  APP_URL: z.string().url(),
-  API_URL: z.string().url(),
-  CORS_ORIGIN: z.string().min(1)
+  NODE_ENV:                  z.enum(["development", "test", "production"]).default("development"),
+  PORT:                      z.coerce.number().default(8080),
+  DATABASE_URL:              z.string().default("postgresql://localhost:5432/agentverse"),
+  DIRECT_URL:                z.string().optional(),
+  JWT_ACCESS_SECRET:         z.string().min(1),
+  JWT_REFRESH_SECRET:        z.string().min(1),
+  GOOGLE_CLIENT_ID:          z.string().optional(),
+  GOOGLE_CLIENT_SECRET:      z.string().optional(),
+  GOOGLE_CALLBACK_URL:       z.string().optional(),
+  RAZORPAY_KEY_ID:           z.string().default("rzp_test_placeholder"),
+  RAZORPAY_KEY_SECRET:       z.string().default("placeholder"),
+  RAZORPAY_WEBHOOK_SECRET:   z.string().min(1),
+  APP_URL:                   z.string().default("http://localhost:3000"),
+  API_URL:                   z.string().default("http://localhost:8080"),
+  CORS_ORIGIN:               z.string().default("*"),
 });
 
 export const env = envSchema.parse(process.env);

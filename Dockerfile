@@ -7,21 +7,19 @@ COPY . .
 
 RUN npm install --include=dev
 
-# 1. Build workspace config package (API imports @agentverse/config at runtime)
-RUN node_modules/.bin/tsc -p packages/config/tsconfig.json
-
-# 2. Generate Prisma client
+# Generate Prisma client (native binary — must stay external)
 RUN node_modules/.bin/prisma generate
 
-# 3. Bundle API — esbuild resolves @/ aliases, externalises node_modules
-#    @agentverse/config is in node_modules as a symlink → packages/config/dist (built above)
+# Bundle entire API + all workspace packages into ONE file.
+# esbuild resolves @/ aliases via tsconfig and inlines everything except @prisma/*
 RUN node_modules/.bin/esbuild apps/api/src/server.ts \
     --bundle \
-    --packages=external \
     --platform=node \
     --format=esm \
     --outfile=apps/api/dist/server.js \
-    --tsconfig=apps/api/tsconfig.json
+    --tsconfig=apps/api/tsconfig.json \
+    --external:@prisma/client \
+    --external:@prisma/engines
 
 RUN npm prune --production
 

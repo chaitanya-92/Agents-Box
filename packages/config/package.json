@@ -3,13 +3,12 @@
   "version": "1.0.0",
   "private": true,
   "type": "module",
-  "main": "./dist/index.js",
-  "types": "./dist/index.d.ts",
+  "main": "./index.ts",
+  "types": "./index.ts",
   "exports": {
     ".": {
-      "types": "./dist/index.d.ts",
-      "import": "./dist/index.js",
-      "default": "./dist/index.js"
+      "import": "./index.ts",
+      "default": "./index.ts"
     }
   },
   "scripts": {
@@ -17,4 +16,3 @@
     "dev": "tsc -p tsconfig.json --watch"
   }
 }
-

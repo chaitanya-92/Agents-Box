@@ -9,7 +9,7 @@ RUN npm install --include=dev
 
 RUN node_modules/.bin/prisma generate
 
-# CJS format — supports dynamic require() used by dotenv and other packages
+# CJS bundle — handles dynamic require() from dotenv and other packages
 RUN node_modules/.bin/esbuild apps/api/src/server.ts \
     --bundle \
     --platform=node \
@@ -19,7 +19,7 @@ RUN node_modules/.bin/esbuild apps/api/src/server.ts \
     --external:@prisma/client \
     --external:@prisma/engines
 
-RUN npm prune --production
+# NOTE: no npm prune — keeps Prisma query engine binaries intact
 
 ENV NODE_ENV=production
 EXPOSE 8080

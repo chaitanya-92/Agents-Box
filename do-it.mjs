@@ -34,9 +34,9 @@ async function main() {
   console.log("📦 Committing all fixes...");
   // Remove stale git locks (left behind by crashed git processes / sandbox writes)
   run("rm -f .git/HEAD.lock .git/index.lock .git/refs/heads/main.lock 2>/dev/null || true");
-  run("git add Dockerfile apps/api/package.json apps/api/src/config/env.ts apps/api/src/server.ts apps/api/src/lib/prisma.ts apps/api/src/modules/auth/google.strategy.ts apps/api/start.cjs prisma/schema.prisma do-it.mjs apps/web/lib/env.ts .github/workflows/ci.yml");
+  run("git add Dockerfile apps/api/package.json apps/api/src/config/env.ts apps/api/src/server.ts apps/api/src/lib/prisma.ts apps/api/src/modules/auth/google.strategy.ts apps/api/start.cjs prisma/schema.prisma prisma/migrations do-it.mjs apps/web/lib/env.ts .github/workflows/ci.yml");
   try {
-    run('git commit -m "fix: set Vercel rootDirectory, simplify CI, npm install in typecheck"');
+    run('git commit -m "fix: add migration file, use migrate deploy on startup, fix Vercel root"');
     console.log("   ✅ Committed");
   } catch { console.log("   (nothing new to commit)"); }
 

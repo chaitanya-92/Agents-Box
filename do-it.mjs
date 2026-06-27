@@ -34,9 +34,9 @@ async function main() {
   console.log("📦 Committing all fixes...");
   // Remove stale git locks (left behind by crashed git processes / sandbox writes)
   run("rm -f .git/HEAD.lock .git/index.lock .git/refs/heads/main.lock 2>/dev/null || true");
-  run("git add Dockerfile apps/api/package.json apps/api/src/config/env.ts apps/api/src/server.ts apps/api/src/lib/prisma.ts apps/api/src/modules/auth/google.strategy.ts apps/api/start.cjs prisma/schema.prisma do-it.mjs");
+  run("git add Dockerfile apps/api/package.json apps/api/src/config/env.ts apps/api/src/server.ts apps/api/src/lib/prisma.ts apps/api/src/modules/auth/google.strategy.ts apps/api/start.cjs prisma/schema.prisma do-it.mjs apps/web/lib/env.ts");
   try {
-    run('git commit -m "fix: crash wrapper + explicit binary targets + resilient env init"');
+    run('git commit -m "fix: run migrations on startup, fix unhandledRejection crash, set Vercel API url"');
     console.log("   ✅ Committed");
   } catch { console.log("   (nothing new to commit)"); }
 
@@ -61,6 +61,9 @@ async function main() {
   const jwtRefresh = (existing.JWT_REFRESH_SECRET?.length ?? 0) >= 32 ? existing.JWT_REFRESH_SECRET : randomBytes(32).toString("hex");
   const webhookSec = existing.RAZORPAY_WEBHOOK_SECRET || randomBytes(24).toString("hex");
 
+  const GOOGLE_CLIENT_ID     = secrets.GOOGLE_CLIENT_ID     ?? "";
+  const GOOGLE_CLIENT_SECRET = secrets.GOOGLE_CLIENT_SECRET ?? "";
+
   await rnd("PUT", `/services/${RENDER_SVC_ID}/env-vars`, [
     { key: "NODE_ENV",                value: "production" },
     { key: "PORT",                    value: "8080" },
@@ -74,20 +77,73 @@ async function main() {
     { key: "APP_URL",                 value: "https://agentverse-ai-web.vercel.app" },
     { key: "API_URL",                 value: "https://agentverse-api.onrender.com" },
     { key: "CORS_ORIGIN",             value: "https://agentverse-ai-web.vercel.app" },
+    { key: "GOOGLE_CLIENT_ID",        value: GOOGLE_CLIENT_ID },
+    { key: "GOOGLE_CLIENT_SECRET",    value: GOOGLE_CLIENT_SECRET },
     { key: "GOOGLE_CALLBACK_URL",     value: "https://agentverse-api.onrender.com/api/v1/auth/google/callback" },
   ]);
   console.log("   ✅ Env vars set\n");
 
-  // ── 4. Run Prisma migrations ─────────────────────────────────────────────────
-  console.log("🗄  Running Prisma migrations via API...");
-  // (migrations run inside the container via start command — skipped here)
+  // ── 4. Patch Vercel env vars ─────────────────────────────────────────────────
+  console.log("🔧 Patching Vercel env vars...");
+  const VERCEL_TOKEN      = secrets.VERCEL_TOKEN      ?? process.env.VERCEL_TOKEN;
+  const VERCEL_PROJECT_ID = secrets.VERCEL_PROJECT_ID ?? "prj_VEllIgpWNTYImFEMuHxbpY8bepxx";
+  const VERCEL_TEAM_ID    = secrets.VERCEL_TEAM_ID    ?? "team_0VWxxugv4B1uUBvS3Dc7rFAZ";
 
-  // ── 5. Trigger deploy ────────────────────────────────────────────────────────
-  console.log("🔁 Triggering deploy...");
+  const vcl = async (method, path, body) => {
+    const url = `https://api.vercel.com${path}${path.includes("?") ? "&" : "?"}teamId=${VERCEL_TEAM_ID}`;
+    const r = await fetch(url, {
+      method,
+      headers: { Authorization: `Bearer ${VERCEL_TOKEN}`, "Content-Type": "application/json" },
+      body: body ? JSON.stringify(body) : undefined,
+    });
+    const t = await r.text();
+    return { ok: r.ok, status: r.status, body: t ? JSON.parse(t) : null };
+  };
+
+  // Fetch existing env vars to avoid duplicates
+  const { body: envBody } = await vcl("GET", `/v9/projects/${VERCEL_PROJECT_ID}/env`);
+  const existingEnvs = envBody?.envs ?? [];
+  const envMap = Object.fromEntries(existingEnvs.map(e => [e.key, e.id]));
+
+  const vercelEnvs = [
+    { key: "NEXT_PUBLIC_API_URL",              value: "https://agentverse-api.onrender.com/api/v1" },
+    { key: "NEXT_PUBLIC_APP_URL",              value: "https://agentverse-ai-web.vercel.app" },
+    { key: "NEXT_PUBLIC_RAZORPAY_KEY_ID",      value: "rzp_test_T5JQ4Xm8fRjBAh" },
+    { key: "NEXT_PUBLIC_GOOGLE_AUTH_ENABLED",  value: GOOGLE_CLIENT_ID ? "true" : "false" },
+  ];
+
+  for (const { key, value } of vercelEnvs) {
+    if (envMap[key]) {
+      // Update existing
+      const r = await vcl("PATCH", `/v9/projects/${VERCEL_PROJECT_ID}/env/${envMap[key]}`, { value, target: ["production", "preview", "development"], type: "plain" });
+      console.log(`   ${r.ok ? "✅" : "⚠️ "} ${key}`);
+    } else {
+      // Create new
+      const r = await vcl("POST", `/v9/projects/${VERCEL_PROJECT_ID}/env`, { key, value, target: ["production", "preview", "development"], type: "plain" });
+      console.log(`   ${r.ok ? "✅" : "⚠️ "} ${key} (created)`);
+    }
+  }
+
+  // Trigger Vercel redeploy to pick up new env vars
+  const { body: deploysBody } = await vcl("GET", `/v6/deployments?projectId=${VERCEL_PROJECT_ID}&limit=1`);
+  const lastDeploy = deploysBody?.deployments?.[0];
+  if (lastDeploy) {
+    await vcl("POST", `/v13/deployments?forceNew=1`, {
+      name: "agentverse-ai-web",
+      deploymentId: lastDeploy.uid,
+      target: "production",
+    });
+    console.log("   🔄 Vercel redeploy triggered\n");
+  } else {
+    console.log("   ⚠️  Could not find last Vercel deployment to redeploy\n");
+  }
+
+  // ── 6. Trigger Render deploy ─────────────────────────────────────────────────
+  console.log("🔁 Triggering Render deploy...");
   const deploy = await rnd("POST", `/services/${RENDER_SVC_ID}/deploys`, { clearCache: "do_not_clear" });
   console.log(`   Deploy ID: ${deploy?.id}\n`);
 
-  // ── 6. Poll until live ───────────────────────────────────────────────────────
+  // ── 7. Poll until live ───────────────────────────────────────────────────────
   console.log("⏳ Polling every 30s...\n");
   for (let i = 1; i <= 40; i++) {
     await new Promise(r => setTimeout(r, 30000));

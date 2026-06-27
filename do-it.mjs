@@ -35,9 +35,9 @@ async function main() {
   // Remove stale git locks (left behind by crashed git processes / sandbox writes)
   run("rm -f .git/HEAD.lock .git/index.lock .git/refs/heads/main.lock 2>/dev/null || true");
   // Never use git add -A — secrets like .env.deploy must stay out of git
-  run("git add apps/api/start.cjs apps/api/src/app.ts apps/web/lib/api.ts apps/web/components/marketing/auth-form.tsx packages/config/plans.ts prisma/migrations/20240101000000_init/migration.sql do-it.mjs");
+  run("git add apps/api/start.cjs apps/api/src/app.ts apps/api/src/modules/billing/billing.service.ts apps/web/lib/api.ts apps/web/components/marketing/auth-form.tsx packages/config/plans.ts prisma/migrations/20240101000000_init/migration.sql do-it.mjs");
   try {
-    run('git commit -m "fix: rewrite auth form (no react-hook-form), cors *, idempotent migrations, stable JWT"');
+    run('git commit -m "fix: razorpay receipt length, auth form rewrite, cors *, stable JWT"');
     console.log("   ✅ Committed");
   } catch { console.log("   (nothing new to commit)"); }
 

@@ -14,7 +14,7 @@ export async function createRazorpayOrder(userId: string, amount: number, planId
   const order = await razorpay.orders.create({
     amount,
     currency: "INR",
-    receipt: `agentverse_${userId}_${Date.now()}`,
+    receipt: `av_${userId.slice(0, 8)}_${Date.now().toString(36)}`, // max 40 chars
     notes: {
       planId
     }

@@ -15,8 +15,11 @@ export function createApp() {
 
   app.use(
     cors({
-      origin: env.CORS_ORIGIN,
-      credentials: true
+      // "*" + credentials: true doesn't work in browsers; use a function instead
+      origin: env.CORS_ORIGIN === "*"
+        ? (_origin: string | undefined, cb: (e: Error | null, ok?: boolean) => void) => cb(null, true)
+        : env.CORS_ORIGIN.split(",").map((s: string) => s.trim()),
+      credentials: true,
     })
   );
   app.use(helmet());

@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 import { execSync } from "child_process";
-import { readFileSync } from "fs";
+import { readFileSync, writeFileSync } from "fs";
 import { resolve, dirname } from "path";
 import { fileURLToPath } from "url";
 import { randomBytes } from "crypto";
@@ -35,9 +35,9 @@ async function main() {
   // Remove stale git locks (left behind by crashed git processes / sandbox writes)
   run("rm -f .git/HEAD.lock .git/index.lock .git/refs/heads/main.lock 2>/dev/null || true");
   // Never use git add -A — secrets like .env.deploy must stay out of git
-  run("git add apps/web/lib/api.ts packages/config/plans.ts do-it.mjs");
+  run("git add apps/api/start.cjs apps/api/src/app.ts apps/web/lib/api.ts packages/config/plans.ts prisma/migrations/20240101000000_init/migration.sql do-it.mjs");
   try {
-    run('git commit -m "fix: starter plan ₹1, auto-redirect on 401, handle expired JWT"');
+    run('git commit -m "fix: idempotent migrations, cors *, stable JWT, production-ready"');
     console.log("   ✅ Committed");
   } catch { console.log("   (nothing new to commit)"); }
 
@@ -58,9 +58,26 @@ async function main() {
     existing = Object.fromEntries((cur ?? []).map(e => [e.envVar.key, e.envVar.value]));
   } catch {}
 
-  const jwtAccess  = (existing.JWT_ACCESS_SECRET?.length  ?? 0) >= 32 ? existing.JWT_ACCESS_SECRET  : randomBytes(32).toString("hex");
-  const jwtRefresh = (existing.JWT_REFRESH_SECRET?.length ?? 0) >= 32 ? existing.JWT_REFRESH_SECRET : randomBytes(32).toString("hex");
-  const webhookSec = existing.RAZORPAY_WEBHOOK_SECRET || randomBytes(24).toString("hex");
+  // Preserve existing secrets so tokens stay valid across deploys
+  const jwtAccess  = (existing.JWT_ACCESS_SECRET?.length  ?? 0) >= 32 ? existing.JWT_ACCESS_SECRET  : (secrets.JWT_ACCESS_SECRET  || randomBytes(32).toString("hex"));
+  const jwtRefresh = (existing.JWT_REFRESH_SECRET?.length ?? 0) >= 32 ? existing.JWT_REFRESH_SECRET : (secrets.JWT_REFRESH_SECRET || randomBytes(32).toString("hex"));
+  const webhookSec = existing.RAZORPAY_WEBHOOK_SECRET || secrets.RAZORPAY_WEBHOOK_SECRET || randomBytes(24).toString("hex");
+
+  // Write secrets back to .env.deploy so they're stable on future runs
+  const envDeployPath = resolve(DIR, ".env.deploy");
+  const currentEnvDeploy = readFileSync(envDeployPath, "utf8").replace(/\r\n/g, "\n");
+  const updatedEnvDeploy = currentEnvDeploy
+    .replace(/^JWT_ACCESS_SECRET=.*$/m,  `JWT_ACCESS_SECRET=${jwtAccess}`)
+    .replace(/^JWT_REFRESH_SECRET=.*$/m, `JWT_REFRESH_SECRET=${jwtRefresh}`)
+    .replace(/^RAZORPAY_WEBHOOK_SECRET=.*$/m, `RAZORPAY_WEBHOOK_SECRET=${webhookSec}`);
+  const withNew = (src, key, val) => src.match(new RegExp(`^${key}=`, "m")) ? src : src + `\n${key}=${val}`;
+  const finalEnvDeploy = [
+    ["JWT_ACCESS_SECRET", jwtAccess],
+    ["JWT_REFRESH_SECRET", jwtRefresh],
+    ["RAZORPAY_WEBHOOK_SECRET", webhookSec],
+  ].reduce((s, [k, v]) => withNew(s, k, v), updatedEnvDeploy);
+  writeFileSync(envDeployPath, finalEnvDeploy.trim() + "\n", "utf8");
+  console.log("   🔐 JWT secrets saved to .env.deploy (stable across deploys)");
 
   const GOOGLE_CLIENT_ID     = secrets.GOOGLE_CLIENT_ID     ?? "";
   const GOOGLE_CLIENT_SECRET = secrets.GOOGLE_CLIENT_SECRET ?? "";
@@ -77,7 +94,7 @@ async function main() {
     { key: "RAZORPAY_WEBHOOK_SECRET", value: webhookSec },
     { key: "APP_URL",                 value: "https://agentverse-ai-web.vercel.app" },
     { key: "API_URL",                 value: "https://agentverse-api.onrender.com" },
-    { key: "CORS_ORIGIN",             value: "https://agentverse-ai-web.vercel.app" },
+    { key: "CORS_ORIGIN",             value: "*" },
     { key: "GOOGLE_CLIENT_ID",        value: GOOGLE_CLIENT_ID },
     { key: "GOOGLE_CLIENT_SECRET",    value: GOOGLE_CLIENT_SECRET },
     { key: "GOOGLE_CALLBACK_URL",     value: "https://agentverse-api.onrender.com/api/v1/auth/google/callback" },

@@ -21,8 +21,8 @@ process.on("unhandledRejection", function (reason) {
 const prismaCliPath = path.join(__dirname, "../../node_modules/.bin/prisma");
 const repoRoot = path.join(__dirname, "../..");
 try {
-  console.log("[startup] Running prisma migrate deploy...");
-  execFileSync(prismaCliPath, ["migrate", "deploy"], {
+  console.log("[startup] Running prisma db push (sync schema to DB)...");
+  execFileSync(prismaCliPath, ["db", "push", "--accept-data-loss"], {
     stdio: "inherit",
     env: process.env,
     cwd: repoRoot,

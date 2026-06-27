@@ -34,9 +34,9 @@ async function main() {
   console.log("📦 Committing all fixes...");
   // Remove stale git locks (left behind by crashed git processes / sandbox writes)
   run("rm -f .git/HEAD.lock .git/index.lock .git/refs/heads/main.lock 2>/dev/null || true");
-  run("git add Dockerfile apps/api/package.json apps/api/src/config/env.ts apps/api/src/server.ts apps/api/src/lib/prisma.ts apps/api/src/modules/auth/google.strategy.ts apps/api/start.cjs prisma/schema.prisma do-it.mjs apps/web/lib/env.ts");
+  run("git add Dockerfile apps/api/package.json apps/api/src/config/env.ts apps/api/src/server.ts apps/api/src/lib/prisma.ts apps/api/src/modules/auth/google.strategy.ts apps/api/start.cjs prisma/schema.prisma do-it.mjs apps/web/lib/env.ts .github/workflows/ci.yml");
   try {
-    run('git commit -m "fix: run migrations on startup, fix unhandledRejection crash, set Vercel API url"');
+    run('git commit -m "fix: set Vercel rootDirectory, simplify CI, npm install in typecheck"');
     console.log("   ✅ Committed");
   } catch { console.log("   (nothing new to commit)"); }
 
@@ -83,8 +83,8 @@ async function main() {
   ]);
   console.log("   ✅ Env vars set\n");
 
-  // ── 4. Patch Vercel env vars ─────────────────────────────────────────────────
-  console.log("🔧 Patching Vercel env vars...");
+  // ── 4. Ensure Vercel project root directory is apps/web ─────────────────────
+  console.log("🔧 Ensuring Vercel project rootDirectory = apps/web...");
   const VERCEL_TOKEN      = secrets.VERCEL_TOKEN      ?? process.env.VERCEL_TOKEN;
   const VERCEL_PROJECT_ID = secrets.VERCEL_PROJECT_ID ?? "prj_VEllIgpWNTYImFEMuHxbpY8bepxx";
   const VERCEL_TEAM_ID    = secrets.VERCEL_TEAM_ID    ?? "team_0VWxxugv4B1uUBvS3Dc7rFAZ";
@@ -99,6 +99,12 @@ async function main() {
     const t = await r.text();
     return { ok: r.ok, status: r.status, body: t ? JSON.parse(t) : null };
   };
+
+  const rootPatch = await vcl("PATCH", `/v9/projects/${VERCEL_PROJECT_ID}`, { rootDirectory: "apps/web" });
+  console.log(`   ${rootPatch.ok ? "✅ rootDirectory = apps/web" : "⚠️  " + JSON.stringify(rootPatch.body)}\n`);
+
+  // ── 5. Patch Vercel env vars ─────────────────────────────────────────────────
+  console.log("🔧 Patching Vercel env vars...");
 
   // Fetch existing env vars to avoid duplicates
   const { body: envBody } = await vcl("GET", `/v9/projects/${VERCEL_PROJECT_ID}/env`);

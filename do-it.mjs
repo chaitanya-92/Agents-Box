@@ -35,9 +35,9 @@ async function main() {
   // Remove stale git locks (left behind by crashed git processes / sandbox writes)
   run("rm -f .git/HEAD.lock .git/index.lock .git/refs/heads/main.lock 2>/dev/null || true");
   // Never use git add -A — secrets like .env.deploy must stay out of git
-  run("git add Dockerfile apps/ prisma/ do-it.mjs .github/ .gitignore apps/web/next.config.ts apps/web/tsconfig.json");
+  run("git add apps/web/lib/api.ts packages/config/plans.ts do-it.mjs");
   try {
-    run('git commit -m "feat: production app — agents marketplace, chat UI, plans+Razorpay, auth guard, real dashboard"');
+    run('git commit -m "fix: starter plan ₹1, auto-redirect on 401, handle expired JWT"');
     console.log("   ✅ Committed");
   } catch { console.log("   (nothing new to commit)"); }
 

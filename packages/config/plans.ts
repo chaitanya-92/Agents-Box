@@ -12,8 +12,8 @@ export const pricingPlans: PricingPlan[] = [
   {
     id: "starter",
     name: "Starter",
-    monthlyPrice: 999,
-    yearlyPrice: 9999,
+    monthlyPrice: 1,
+    yearlyPrice: 1,
     description: "For creators and solo operators getting started with AI agents.",
     features: ["6 core agents", "10K monthly credits", "Basic analytics", "Email support"]
   },

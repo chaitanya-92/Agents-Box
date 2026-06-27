@@ -1,5 +1,5 @@
 import { publicEnv } from "@/lib/env";
-import { getAccessToken } from "@/lib/auth";
+import { clearAuthSession, getAccessToken } from "@/lib/auth";
 
 type ApiEnvelope<T> = { success: boolean; message: string; data: T };
 type RequestOptions = { method?: "GET" | "POST"; body?: unknown; token?: string | null };
@@ -13,6 +13,14 @@ async function request<T>(path: string, options: RequestOptions = {}) {
     },
     body: options.body ? JSON.stringify(options.body) : undefined
   });
+
+  // JWT expired / invalid — clear session and redirect to login
+  if (response.status === 401) {
+    clearAuthSession();
+    if (typeof window !== "undefined") window.location.href = "/login";
+    throw new Error("Session expired. Please log in again.");
+  }
+
   const payload = (await response.json()) as ApiEnvelope<T> & { details?: unknown };
   if (!response.ok || !payload.success) throw new Error(payload.message || "Request failed");
   return payload;

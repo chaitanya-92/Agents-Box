@@ -34,9 +34,10 @@ async function main() {
   console.log("📦 Committing all fixes...");
   // Remove stale git locks (left behind by crashed git processes / sandbox writes)
   run("rm -f .git/HEAD.lock .git/index.lock .git/refs/heads/main.lock 2>/dev/null || true");
-  run("git add Dockerfile apps/api/package.json apps/api/src/config/env.ts apps/api/src/server.ts apps/api/src/lib/prisma.ts apps/api/src/modules/auth/google.strategy.ts apps/api/start.cjs prisma/schema.prisma prisma/migrations do-it.mjs apps/web/lib/env.ts .github/workflows/ci.yml");
+  // Never use git add -A — secrets like .env.deploy must stay out of git
+  run("git add Dockerfile apps/ prisma/ do-it.mjs .github/ .gitignore apps/web/next.config.ts apps/web/tsconfig.json");
   try {
-    run('git commit -m "fix: add migration file, use migrate deploy on startup, fix Vercel root"');
+    run('git commit -m "feat: production app — agents marketplace, chat UI, plans+Razorpay, auth guard, real dashboard"');
     console.log("   ✅ Committed");
   } catch { console.log("   (nothing new to commit)"); }
 
@@ -71,8 +72,8 @@ async function main() {
     { key: "DIRECT_URL",              value: `postgresql://postgres.${PROJECT_REF}:${DB_PASS}@db.${PROJECT_REF}.supabase.co:5432/postgres` },
     { key: "JWT_ACCESS_SECRET",       value: jwtAccess },
     { key: "JWT_REFRESH_SECRET",      value: jwtRefresh },
-    { key: "RAZORPAY_KEY_ID",         value: "rzp_test_T5JQ4Xm8fRjBAh" },
-    { key: "RAZORPAY_KEY_SECRET",     value: "EoSIYaJpwkxd2fcpRhWDg1mB" },
+    { key: "RAZORPAY_KEY_ID",         value: secrets.RAZORPAY_KEY_ID     ?? "rzp_test_T6Xe07Lpfq8jTL" },
+    { key: "RAZORPAY_KEY_SECRET",     value: secrets.RAZORPAY_KEY_SECRET ?? "2ncVpv5obVShDmjnD7i0EYnq" },
     { key: "RAZORPAY_WEBHOOK_SECRET", value: webhookSec },
     { key: "APP_URL",                 value: "https://agentverse-ai-web.vercel.app" },
     { key: "API_URL",                 value: "https://agentverse-api.onrender.com" },
@@ -114,7 +115,7 @@ async function main() {
   const vercelEnvs = [
     { key: "NEXT_PUBLIC_API_URL",              value: "https://agentverse-api.onrender.com/api/v1" },
     { key: "NEXT_PUBLIC_APP_URL",              value: "https://agentverse-ai-web.vercel.app" },
-    { key: "NEXT_PUBLIC_RAZORPAY_KEY_ID",      value: "rzp_test_T5JQ4Xm8fRjBAh" },
+    { key: "NEXT_PUBLIC_RAZORPAY_KEY_ID",      value: secrets.RAZORPAY_KEY_ID ?? "rzp_test_T6Xe07Lpfq8jTL" },
     { key: "NEXT_PUBLIC_GOOGLE_AUTH_ENABLED",  value: GOOGLE_CLIENT_ID ? "true" : "false" },
   ];
 

@@ -1,70 +1,131 @@
-import { Suspense } from "react";
+"use client";
+
+import Link from "next/link";
+import { useEffect, useState } from "react";
 import { agentCatalog, pricingPlans } from "@agentverse/config";
-import { OauthSessionSync } from "@/components/auth/oauth-session-sync";
+import { type Subscription, type UsageStats, getMySubscription, getUsageStats } from "@/lib/api";
+import { getCurrentUser } from "@/lib/auth";
+
+function StatCard({ label, value }: { label: string; value: string | number }) {
+  return (
+    <div className="pixel-panel p-6">
+      <p className="text-sm text-white/55">{label}</p>
+      <p className="mt-4 font-[var(--font-pixel)] text-2xl text-white">{value}</p>
+    </div>
+  );
+}
+
+const PLAN_CREDITS: Record<string, number> = { starter: 10000, pro: 75000, scale: 250000 };
 
 export default function DashboardPage() {
+  const [sub, setSub] = useState<Subscription | null | undefined>(undefined);
+  const [usage, setUsage] = useState<UsageStats | null>(null);
+  const user = typeof window !== "undefined" ? getCurrentUser() : null;
+
+  useEffect(() => {
+    getMySubscription().then((r) => setSub(r.data)).catch(() => setSub(null));
+    getUsageStats().then((r) => setUsage(r.data)).catch(() => setUsage(null));
+  }, []);
+
+  const plan = pricingPlans.find((p) => p.id === sub?.planId);
+  const totalCredits = plan ? PLAN_CREDITS[plan.id] ?? 0 : 0;
+  const usedCredits = usage?.totalInvocations ?? 0;
+  const remaining = Math.max(0, totalCredits - usedCredits);
+
   return (
-    <main className="mx-auto min-h-screen max-w-7xl px-4 py-12 sm:px-6 lg:px-8">
-      <Suspense fallback={null}>
-        <OauthSessionSync />
-      </Suspense>
-      <div className="mb-10 flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
+    <main className="mx-auto max-w-6xl px-6 py-10">
+      <div className="mb-8 flex items-end justify-between">
         <div>
           <p className="section-label">Workspace</p>
-          <h1 className="mt-3 font-[var(--font-pixel)] text-3xl text-white">AgentVerse Dashboard</h1>
-          <p className="mt-4 max-w-2xl text-sm leading-7 text-white/65">
-            A starter dashboard for subscriptions, agent usage, and product analytics.
-          </p>
+          <h1 className="mt-2 font-[var(--font-pixel)] text-3xl text-white">
+            {user ? `Hey, ${user.name.split(" ")[0]}` : "Dashboard"}
+          </h1>
+          <p className="mt-2 text-sm text-white/55">Your AgentVerse workspace at a glance.</p>
         </div>
-        <div className="pixel-panel px-5 py-4">
-          <p className="text-sm text-white/60">Current plan</p>
-          <p className="mt-2 font-[var(--font-pixel)] text-lg text-sky-200">{pricingPlans[1]?.name}</p>
+        <div className="pixel-panel px-5 py-4 text-right">
+          <p className="text-xs text-white/45">Current plan</p>
+          {sub === undefined ? (
+            <p className="mt-1 text-sm text-white/30">Loading…</p>
+          ) : sub ? (
+            <p className="mt-1 font-[var(--font-pixel)] text-lg text-sky-200">{plan?.name ?? sub.planId}</p>
+          ) : (
+            <Link href="/plans" className="mt-1 block text-sm text-amber-300 hover:text-amber-200">
+              No plan — Upgrade →
+            </Link>
+          )}
         </div>
       </div>
 
       <div className="grid gap-5 md:grid-cols-3">
-        {[
-          { label: "Credits remaining", value: "58,420" },
-          { label: "Active subscriptions", value: "1" },
-          { label: "Invocations today", value: "214" }
-        ].map((stat) => (
-          <div key={stat.label} className="pixel-panel p-6">
-            <p className="text-sm text-white/55">{stat.label}</p>
-            <p className="mt-4 font-[var(--font-pixel)] text-2xl text-white">{stat.value}</p>
-          </div>
-        ))}
+        <StatCard label="Credits remaining" value={sub ? remaining.toLocaleString() : "—"} />
+        <StatCard label="Active subscription" value={sub ? "Active" : "None"} />
+        <StatCard label="Invocations today" value={usage?.todayInvocations ?? "—"} />
       </div>
 
-      <div className="mt-8 grid gap-6 xl:grid-cols-[1.2fr_0.8fr]">
+      <div className="mt-8 grid gap-6 xl:grid-cols-[1.4fr_0.6fr]">
+        {/* Agents */}
         <div className="pixel-panel p-6">
-          <p className="section-label">Popular Agents</p>
-          <div className="mt-5 space-y-3">
-            {agentCatalog.slice(0, 8).map((agent) => (
-              <div key={agent.id} className="flex items-center justify-between border border-white/10 px-4 py-4">
+          <div className="flex items-center justify-between mb-5">
+            <p className="section-label">Popular Agents</p>
+            <Link href="/agents" className="text-xs text-sky-200 hover:text-sky-100">
+              View all →
+            </Link>
+          </div>
+          <div className="space-y-2">
+            {agentCatalog.filter((a) => a.featured).slice(0, 6).map((agent) => (
+              <Link
+                key={agent.id}
+                href={`/agents/${agent.id}`}
+                className="flex items-center justify-between border border-white/10 px-4 py-3 transition hover:border-sky-200/20 hover:bg-sky-200/[0.04]"
+              >
                 <div>
                   <p className="text-sm text-white">{agent.name}</p>
-                  <p className="mt-1 text-xs uppercase tracking-[0.22em] text-white/45">{agent.category}</p>
+                  <p className="mt-0.5 text-xs text-white/40 uppercase tracking-widest">{agent.category}</p>
                 </div>
-                <p className="text-sm text-sky-200">Ready</p>
-              </div>
+                <span className="text-xs text-sky-200">Use →</span>
+              </Link>
             ))}
           </div>
         </div>
 
-        <div className="space-y-6">
+        {/* Status panels */}
+        <div className="space-y-5">
           <div className="pixel-panel p-6">
-            <p className="section-label">Subscription Status</p>
-            <p className="mt-4 font-[var(--font-pixel)] text-xl text-white">Active</p>
-            <p className="mt-4 text-sm leading-7 text-white/65">
-              Webhook updates, payment verification, and entitlement refreshes are wired at the API level.
-            </p>
+            <p className="section-label">Subscription</p>
+            {sub === undefined ? (
+              <p className="mt-4 text-sm text-white/30">Loading…</p>
+            ) : sub ? (
+              <>
+                <p className="mt-3 font-[var(--font-pixel)] text-lg text-white">Active</p>
+                {sub.currentPeriodEnd && (
+                  <p className="mt-2 text-xs text-white/45">
+                    Renews {new Date(sub.currentPeriodEnd).toLocaleDateString()}
+                  </p>
+                )}
+              </>
+            ) : (
+              <>
+                <p className="mt-3 text-sm text-white/55">No active subscription.</p>
+                <Link
+                  href="/plans"
+                  className="mt-4 block border border-sky-200/30 px-4 py-2 text-center text-xs text-sky-200 hover:bg-sky-200/[0.06]"
+                >
+                  Choose a plan
+                </Link>
+              </>
+            )}
           </div>
+
           <div className="pixel-panel p-6">
-            <p className="section-label">Roadmap Ready</p>
-            <p className="mt-4 text-sm leading-7 text-white/65">
-              This structure can extend into team seats, usage charts, audit logs, background jobs, and agent execution
-              history without reworking core boundaries.
-            </p>
+            <p className="section-label">Quick Actions</p>
+            <div className="mt-4 space-y-2">
+              <Link href="/agents" className="block border border-white/10 px-4 py-3 text-xs text-white/70 hover:border-white/20 hover:text-white">
+                Browse all agents →
+              </Link>
+              <Link href="/plans" className="block border border-white/10 px-4 py-3 text-xs text-white/70 hover:border-white/20 hover:text-white">
+                View plans →
+              </Link>
+            </div>
           </div>
         </div>
       </div>

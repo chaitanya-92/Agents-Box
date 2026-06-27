@@ -35,9 +35,9 @@ async function main() {
   // Remove stale git locks (left behind by crashed git processes / sandbox writes)
   run("rm -f .git/HEAD.lock .git/index.lock .git/refs/heads/main.lock 2>/dev/null || true");
   // Never use git add -A — secrets like .env.deploy must stay out of git
-  run("git add apps/api/start.cjs apps/api/src/app.ts apps/web/lib/api.ts packages/config/plans.ts prisma/migrations/20240101000000_init/migration.sql do-it.mjs");
+  run("git add apps/api/start.cjs apps/api/src/app.ts apps/web/lib/api.ts apps/web/components/marketing/auth-form.tsx packages/config/plans.ts prisma/migrations/20240101000000_init/migration.sql do-it.mjs");
   try {
-    run('git commit -m "fix: idempotent migrations, cors *, stable JWT, production-ready"');
+    run('git commit -m "fix: rewrite auth form (no react-hook-form), cors *, idempotent migrations, stable JWT"');
     console.log("   ✅ Committed");
   } catch { console.log("   (nothing new to commit)"); }
 
@@ -148,18 +148,20 @@ async function main() {
     }
   }
 
-  // Trigger Vercel redeploy to pick up new env vars
-  const { body: deploysBody } = await vcl("GET", `/v6/deployments?projectId=${VERCEL_PROJECT_ID}&limit=1`);
-  const lastDeploy = deploysBody?.deployments?.[0];
-  if (lastDeploy) {
-    await vcl("POST", `/v13/deployments?forceNew=1`, {
+  // Trigger a fresh Vercel build from the latest git commit
+  // Get repoId from the project's git integration so we never hardcode it
+  console.log("   🔄 Triggering fresh Vercel build from latest commit...");
+  const { body: projInfo } = await vcl("GET", `/v9/projects/${VERCEL_PROJECT_ID}`);
+  const repoId = projInfo?.link?.repoId;
+  if (repoId) {
+    const freshBuild = await vcl("POST", `/v13/deployments`, {
       name: "agentverse-ai-web",
-      deploymentId: lastDeploy.uid,
       target: "production",
+      gitSource: { type: "github", ref: "main", repoId },
     });
-    console.log("   🔄 Vercel redeploy triggered\n");
+    console.log(`   ${freshBuild.ok ? "✅ Fresh build triggered — id: " + (freshBuild.body?.id ?? freshBuild.body?.uid) : "⚠️  " + JSON.stringify(freshBuild.body?.error ?? freshBuild.body)}\n`);
   } else {
-    console.log("   ⚠️  Could not find last Vercel deployment to redeploy\n");
+    console.log("   ⚠️  Could not get repoId from project — Vercel will auto-deploy from GitHub push\n");
   }
 
   // ── 6. Trigger Render deploy ─────────────────────────────────────────────────

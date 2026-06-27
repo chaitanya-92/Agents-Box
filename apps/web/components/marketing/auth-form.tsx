@@ -1,119 +1,126 @@
 "use client";
 
-import { zodResolver } from "@hookform/resolvers/zod";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
-import { useForm } from "react-hook-form";
-import { z } from "zod";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
 import { loginUser, registerUser } from "@/lib/api";
 import { storeAuthSession } from "@/lib/auth";
 import { publicEnv } from "@/lib/env";
 
-const loginSchema = z.object({
-  email: z.string().email("Enter a valid email address"),
-  password: z.string().min(8, "Password must be at least 8 characters")
-});
-
-const registerSchema = loginSchema.extend({
-  name: z.string().min(2, "Name is required")
-});
-
 type AuthVariant = "login" | "register";
-type LoginValues = z.infer<typeof loginSchema>;
-type RegisterValues = z.infer<typeof registerSchema>;
+
+function Field({
+  label, type = "text", value, onChange, placeholder, error,
+}: {
+  label: string; type?: string; value: string;
+  onChange: (v: string) => void; placeholder: string; error?: string;
+}) {
+  return (
+    <div className="space-y-1">
+      <label className="block text-sm text-white/75">{label}</label>
+      <input
+        type={type}
+        value={value}
+        onChange={e => onChange(e.target.value)}
+        placeholder={placeholder}
+        className="w-full rounded border border-white/15 bg-white/[0.04] px-4 py-2.5 text-sm text-white placeholder:text-white/30 focus:border-sky-400 focus:outline-none"
+      />
+      {error && <p className="text-xs text-rose-400">{error}</p>}
+    </div>
+  );
+}
 
 function LoginFields() {
-  const [submitError, setSubmitError] = useState<string | null>(null);
   const router = useRouter();
-  const form = useForm<LoginValues>({
-    resolver: zodResolver(loginSchema),
-    defaultValues: { email: "", password: "" }
-  });
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+  const [error, setError] = useState("");
+  const [loading, setLoading] = useState(false);
 
-  const onSubmit = async (values: LoginValues) => {
-    setSubmitError(null);
+  async function handleSubmit(e: React.FormEvent) {
+    e.preventDefault();
+    setError("");
 
+    if (!email.includes("@")) { setError("Enter a valid email address"); return; }
+    if (password.length < 6) { setError("Password must be at least 6 characters"); return; }
+
+    setLoading(true);
     try {
-      const response = await loginUser(values);
+      const res = await loginUser({ email, password });
       storeAuthSession({
-        accessToken: response.data.tokens.accessToken,
-        refreshToken: response.data.tokens.refreshToken,
-        user: response.data.user
+        accessToken: res.data.tokens.accessToken,
+        refreshToken: res.data.tokens.refreshToken,
+        user: res.data.user,
       });
       router.push("/dashboard");
-    } catch (error) {
-      setSubmitError(error instanceof Error ? error.message : "Login failed");
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Login failed");
+    } finally {
+      setLoading(false);
     }
-  };
+  }
 
   return (
-    <form className="mt-8 space-y-5" onSubmit={form.handleSubmit(onSubmit)}>
-      <div className="space-y-2">
-        <label className="text-sm text-white/75">Email</label>
-        <Input {...form.register("email")} placeholder="you@agentverse.ai" />
-        <p className="text-xs text-rose-300">{form.formState.errors.email?.message}</p>
-      </div>
-      <div className="space-y-2">
-        <label className="text-sm text-white/75">Password</label>
-        <Input type="password" {...form.register("password")} placeholder="••••••••" />
-        <p className="text-xs text-rose-300">{form.formState.errors.password?.message}</p>
-      </div>
-      <Button type="submit" className="w-full">
-        {form.formState.isSubmitting ? "Logging in..." : "Login"}
-      </Button>
-      {submitError ? <p className="text-sm text-rose-300">{submitError}</p> : null}
+    <form onSubmit={handleSubmit} className="mt-8 space-y-5">
+      <Field label="Email" type="email" value={email} onChange={setEmail} placeholder="you@agentverse.ai" />
+      <Field label="Password" type="password" value={password} onChange={setPassword} placeholder="••••••••" />
+      {error && <p className="rounded bg-rose-500/10 px-3 py-2 text-sm text-rose-400">{error}</p>}
+      <button
+        type="submit"
+        disabled={loading}
+        className="w-full rounded border border-white/15 bg-white py-2.5 text-sm font-medium text-black transition hover:bg-sky-100 disabled:opacity-60"
+      >
+        {loading ? "Logging in..." : "Login"}
+      </button>
     </form>
   );
 }
 
 function RegisterFields() {
-  const [submitError, setSubmitError] = useState<string | null>(null);
   const router = useRouter();
-  const form = useForm<RegisterValues>({
-    resolver: zodResolver(registerSchema),
-    defaultValues: { name: "", email: "", password: "" }
-  });
+  const [name, setName] = useState("");
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+  const [error, setError] = useState("");
+  const [loading, setLoading] = useState(false);
 
-  const onSubmit = async (values: RegisterValues) => {
-    setSubmitError(null);
+  async function handleSubmit(e: React.FormEvent) {
+    e.preventDefault();
+    setError("");
 
+    if (name.trim().length < 2) { setError("Name must be at least 2 characters"); return; }
+    if (!email.includes("@")) { setError("Enter a valid email address"); return; }
+    if (password.length < 6) { setError("Password must be at least 6 characters"); return; }
+
+    setLoading(true);
     try {
-      const response = await registerUser(values);
+      const res = await registerUser({ name, email, password });
       storeAuthSession({
-        accessToken: response.data.tokens.accessToken,
-        refreshToken: response.data.tokens.refreshToken,
-        user: response.data.user
+        accessToken: res.data.tokens.accessToken,
+        refreshToken: res.data.tokens.refreshToken,
+        user: res.data.user,
       });
       router.push("/dashboard");
-    } catch (error) {
-      setSubmitError(error instanceof Error ? error.message : "Registration failed");
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Registration failed");
+    } finally {
+      setLoading(false);
     }
-  };
+  }
 
   return (
-    <form className="mt-8 space-y-5" onSubmit={form.handleSubmit(onSubmit)}>
-      <div className="space-y-2">
-        <label className="text-sm text-white/75">Full Name</label>
-        <Input {...form.register("name")} placeholder="Chaitanya" />
-        <p className="text-xs text-rose-300">{form.formState.errors.name?.message}</p>
-      </div>
-      <div className="space-y-2">
-        <label className="text-sm text-white/75">Email</label>
-        <Input {...form.register("email")} placeholder="you@agentverse.ai" />
-        <p className="text-xs text-rose-300">{form.formState.errors.email?.message}</p>
-      </div>
-      <div className="space-y-2">
-        <label className="text-sm text-white/75">Password</label>
-        <Input type="password" {...form.register("password")} placeholder="••••••••" />
-        <p className="text-xs text-rose-300">{form.formState.errors.password?.message}</p>
-      </div>
-      <Button type="submit" className="w-full">
-        {form.formState.isSubmitting ? "Creating..." : "Create Account"}
-      </Button>
-      {submitError ? <p className="text-sm text-rose-300">{submitError}</p> : null}
+    <form onSubmit={handleSubmit} className="mt-8 space-y-5">
+      <Field label="Full Name" value={name} onChange={setName} placeholder="Chaitanya" />
+      <Field label="Email" type="email" value={email} onChange={setEmail} placeholder="you@agentverse.ai" />
+      <Field label="Password" type="password" value={password} onChange={setPassword} placeholder="••••••••" />
+      {error && <p className="rounded bg-rose-500/10 px-3 py-2 text-sm text-rose-400">{error}</p>}
+      <button
+        type="submit"
+        disabled={loading}
+        className="w-full rounded border border-white/15 bg-white py-2.5 text-sm font-medium text-black transition hover:bg-sky-100 disabled:opacity-60"
+      >
+        {loading ? "Creating account..." : "Create Account"}
+      </button>
     </form>
   );
 }
@@ -129,8 +136,8 @@ export function AuthForm({ variant }: { variant: AuthVariant }) {
       </h1>
       <p className="mt-4 text-sm leading-7 text-white/65">
         {variant === "login"
-          ? "Use your email and password or continue with Google once backend credentials are configured."
-          : "Create an account to access subscriptions, usage analytics, and the full agent marketplace."}
+          ? "Sign in to access your agents, subscriptions, and usage analytics."
+          : "Create an account to access the full agent marketplace."}
       </p>
 
       {variant === "login" ? <LoginFields /> : <RegisterFields />}
@@ -148,7 +155,7 @@ export function AuthForm({ variant }: { variant: AuthVariant }) {
           disabled
           className="mt-4 flex h-11 w-full cursor-not-allowed items-center justify-center border border-white/10 bg-white/[0.02] text-sm text-white/35"
         >
-          Google login not configured
+          Continue with Google
         </button>
       )}
 

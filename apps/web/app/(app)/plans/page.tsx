@@ -203,7 +203,6 @@ async function downloadPDF(receipt: Receipt, billing: BillingProfile | null) {
   const c2 = margin + 102;
   const c3 = margin + 124;
   const c4 = margin + 146;
-  const colX = [c0, c1, c2, c3, c4];
   const rowH = 9;
 
   doc.setFillColor(...navy);
@@ -211,9 +210,11 @@ async function downloadPDF(receipt: Receipt, billing: BillingProfile | null) {
   doc.setTextColor(255, 255, 255);
   doc.setFont("helvetica", "bold");
   doc.setFontSize(7.5);
-  ["Description", "HSN/SAC", "Rate", "GST 18%", "Amount"].forEach((h, i) => {
-    doc.text(h, colX[i]! + 2, y + 6);
-  });
+  doc.text("Description", c0 + 2, y + 6);
+  doc.text("HSN/SAC",     c1 + 2, y + 6);
+  doc.text("Rate",        c2 + 2, y + 6);
+  doc.text("GST 18%",     c3 + 2, y + 6);
+  doc.text("Amount",      c4 + 2, y + 6);
   y += rowH;
 
   // Row 1

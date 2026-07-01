@@ -145,14 +145,17 @@ function downloadInvoicePDF(invoice: Invoice, profile: UserProfile | null, billi
 
     // Line item header
     const ic0 = margin, ic1 = margin + 80, ic2 = margin + 102, ic3 = margin + 124, ic4 = margin + 146;
-    const colX = [ic0, ic1, ic2, ic3, ic4];
     const rowH = 9;
     doc.setFillColor(...navy);
     doc.rect(margin, y, W - margin * 2, rowH, "F");
     doc.setTextColor(255, 255, 255);
     doc.setFont("helvetica", "bold");
     doc.setFontSize(7.5);
-    (["Description", "HSN/SAC", "Rate", "GST 18%", "Amount"] as const).forEach((h, i) => doc.text(h, colX[i] + 2, y + 6));
+    doc.text("Description", ic0 + 2, y + 6);
+    doc.text("HSN/SAC",     ic1 + 2, y + 6);
+    doc.text("Rate",        ic2 + 2, y + 6);
+    doc.text("GST 18%",     ic3 + 2, y + 6);
+    doc.text("Amount",      ic4 + 2, y + 6);
     y += rowH;
 
     // Line item row
@@ -170,7 +173,8 @@ function downloadInvoicePDF(invoice: Invoice, profile: UserProfile | null, billi
     y += rowH;
 
     // Subtotals
-    [["Subtotal (Base)", fmt(baseAmt)], ["IGST @ 18%", fmt(gstAmt)]].forEach(([label, val]) => {
+    const subtotals: [string, string][] = [["Subtotal (Base)", fmt(baseAmt)], ["IGST @ 18%", fmt(gstAmt)]];
+    subtotals.forEach(([label, val]) => {
       doc.setFont("helvetica", "normal");
       doc.setFontSize(8);
       doc.setTextColor(...grey);

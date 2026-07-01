@@ -40,6 +40,70 @@ export async function sendMail(opts: {
   }
 }
 
+export function buildVerificationEmail(opts: { name: string; verifyUrl: string }): string {
+  return `<!DOCTYPE html>
+<html>
+<head><meta charset="utf-8"/><title>Verify your email</title></head>
+<body style="margin:0;padding:0;background:#0a0f1a;font-family:'Segoe UI',Arial,sans-serif;color:#e2e8f0;">
+  <table width="100%" cellpadding="0" cellspacing="0" style="background:#0a0f1a;padding:40px 0;">
+    <tr><td align="center">
+      <table width="560" cellpadding="0" cellspacing="0" style="max-width:560px;width:100%;background:#0d1424;border:1px solid rgba(186,230,255,0.12);">
+        <tr><td style="padding:28px 36px;border-bottom:1px solid rgba(255,255,255,0.08);">
+          <p style="margin:0;font-size:16px;font-weight:700;color:#bae6ff;letter-spacing:3px;text-transform:uppercase;">AGENTVERSE AI</p>
+        </td></tr>
+        <tr><td style="padding:36px;">
+          <p style="margin:0 0 6px;font-size:22px;font-weight:700;color:#fff;">Verify your email</p>
+          <p style="margin:0 0 24px;font-size:14px;color:rgba(255,255,255,0.55);line-height:1.6;">
+            Hi ${opts.name.split(" ")[0]}, click the button below to verify your email address and activate your account.
+            This link expires in 24 hours.
+          </p>
+          <a href="${opts.verifyUrl}" style="display:inline-block;background:rgba(186,230,255,0.1);border:1px solid rgba(186,230,255,0.3);color:#bae6ff;text-decoration:none;padding:12px 28px;font-size:13px;letter-spacing:1px;">
+            Verify Email →
+          </a>
+          <p style="margin:24px 0 0;font-size:12px;color:rgba(255,255,255,0.3);">
+            Or copy this link: ${opts.verifyUrl}
+          </p>
+        </td></tr>
+        <tr><td style="padding:20px 36px;border-top:1px solid rgba(255,255,255,0.06);">
+          <p style="margin:0;font-size:11px;color:rgba(255,255,255,0.3);">If you didn't create an account, you can ignore this email.</p>
+        </td></tr>
+      </table>
+    </td></tr>
+  </table>
+</body>
+</html>`;
+}
+
+export function buildPasswordResetEmail(opts: { name: string; resetUrl: string }): string {
+  return `<!DOCTYPE html>
+<html>
+<head><meta charset="utf-8"/><title>Reset your password</title></head>
+<body style="margin:0;padding:0;background:#0a0f1a;font-family:'Segoe UI',Arial,sans-serif;color:#e2e8f0;">
+  <table width="100%" cellpadding="0" cellspacing="0" style="background:#0a0f1a;padding:40px 0;">
+    <tr><td align="center">
+      <table width="560" cellpadding="0" cellspacing="0" style="max-width:560px;width:100%;background:#0d1424;border:1px solid rgba(186,230,255,0.12);">
+        <tr><td style="padding:28px 36px;border-bottom:1px solid rgba(255,255,255,0.08);">
+          <p style="margin:0;font-size:16px;font-weight:700;color:#bae6ff;letter-spacing:3px;text-transform:uppercase;">AGENTVERSE AI</p>
+        </td></tr>
+        <tr><td style="padding:36px;">
+          <p style="margin:0 0 6px;font-size:22px;font-weight:700;color:#fff;">Reset your password</p>
+          <p style="margin:0 0 24px;font-size:14px;color:rgba(255,255,255,0.55);line-height:1.6;">
+            Hi ${opts.name.split(" ")[0]}, click below to set a new password. This link expires in 2 hours.
+          </p>
+          <a href="${opts.resetUrl}" style="display:inline-block;background:rgba(186,230,255,0.1);border:1px solid rgba(186,230,255,0.3);color:#bae6ff;text-decoration:none;padding:12px 28px;font-size:13px;letter-spacing:1px;">
+            Reset Password →
+          </a>
+          <p style="margin:24px 0 0;font-size:12px;color:rgba(255,255,255,0.3);">
+            If you didn't request this, you can safely ignore this email.
+          </p>
+        </td></tr>
+      </table>
+    </td></tr>
+  </table>
+</body>
+</html>`;
+}
+
 export function buildWelcomeEmail(opts: {
   name: string;
   planName: string;

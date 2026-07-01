@@ -40,10 +40,8 @@ function LoginFields() {
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     setError("");
-
     if (!email.includes("@")) { setError("Enter a valid email address"); return; }
     if (password.length < 6) { setError("Password must be at least 6 characters"); return; }
-
     setLoading(true);
     try {
       const res = await loginUser({ email, password });
@@ -63,7 +61,21 @@ function LoginFields() {
   return (
     <form onSubmit={handleSubmit} className="mt-8 space-y-5">
       <Field label="Email" type="email" value={email} onChange={setEmail} placeholder="you@agentverse.ai" />
-      <Field label="Password" type="password" value={password} onChange={setPassword} placeholder="••••••••" />
+      <div className="space-y-1">
+        <div className="flex items-center justify-between">
+          <label className="block text-sm text-white/75">Password</label>
+          <Link href="/forgot-password" className="text-xs text-sky-200 hover:text-sky-100 transition">
+            Forgot password?
+          </Link>
+        </div>
+        <input
+          type="password"
+          value={password}
+          onChange={e => setPassword(e.target.value)}
+          placeholder="••••••••"
+          className="w-full rounded border border-white/15 bg-white/[0.04] px-4 py-2.5 text-sm text-white placeholder:text-white/30 focus:border-sky-400 focus:outline-none"
+        />
+      </div>
       {error && <p className="rounded bg-rose-500/10 px-3 py-2 text-sm text-rose-400">{error}</p>}
       <button
         type="submit"
@@ -83,15 +95,14 @@ function RegisterFields() {
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
+  const [registered, setRegistered] = useState(false);
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     setError("");
-
     if (name.trim().length < 2) { setError("Name must be at least 2 characters"); return; }
     if (!email.includes("@")) { setError("Enter a valid email address"); return; }
     if (password.length < 6) { setError("Password must be at least 6 characters"); return; }
-
     setLoading(true);
     try {
       const res = await registerUser({ name, email, password });
@@ -100,7 +111,9 @@ function RegisterFields() {
         refreshToken: res.data.tokens.refreshToken,
         user: res.data.user,
       });
-      router.push("/dashboard");
+      setRegistered(true);
+      // Redirect to dashboard after 4s so user reads the message
+      setTimeout(() => router.push("/dashboard"), 4000);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Registration failed");
     } finally {
@@ -108,12 +121,29 @@ function RegisterFields() {
     }
   }
 
+  if (registered) {
+    return (
+      <div className="mt-8 rounded border border-emerald-400/20 bg-emerald-400/[0.06] px-5 py-5 text-center">
+        <p className="text-2xl mb-3">📬</p>
+        <p className="text-sm font-medium text-emerald-300 mb-1">Account created!</p>
+        <p className="text-xs text-white/55 leading-5">
+          We've emailed a verification link to <strong className="text-white">{email}</strong>.
+          Check your inbox (and spam) to verify your account.
+        </p>
+        <p className="mt-3 text-xs text-white/35">Redirecting to dashboard…</p>
+      </div>
+    );
+  }
+
   return (
     <form onSubmit={handleSubmit} className="mt-8 space-y-5">
       <Field label="Full Name" value={name} onChange={setName} placeholder="Chaitanya" />
       <Field label="Email" type="email" value={email} onChange={setEmail} placeholder="you@agentverse.ai" />
-      <Field label="Password" type="password" value={password} onChange={setPassword} placeholder="••••••••" />
+      <Field label="Password" type="password" value={password} onChange={setPassword} placeholder="At least 6 characters" />
       {error && <p className="rounded bg-rose-500/10 px-3 py-2 text-sm text-rose-400">{error}</p>}
+      <p className="text-xs text-white/35">
+        By registering you get a free 7-day Pro trial — no card required.
+      </p>
       <button
         type="submit"
         disabled={loading}

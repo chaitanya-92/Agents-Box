@@ -3,15 +3,19 @@
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
-import { clearAuthSession, getCurrentUser } from "@/lib/auth";
+import { clearAuthSession, getCurrentUser, type AuthUser } from "@/lib/auth";
+import { resendVerification } from "@/lib/api";
 import { useToast } from "@/components/ui/toast";
 import { Modal } from "@/components/ui/modal";
 
 const NAV = [
-  { href: "/dashboard", label: "Dashboard", icon: "⬡" },
-  { href: "/agents",   label: "Agents",    icon: "◈" },
-  { href: "/plans",    label: "Plans",     icon: "◇" },
-  { href: "/profile",  label: "Profile",   icon: "◉" },
+  { href: "/dashboard",     label: "Dashboard",     icon: "⬡" },
+  { href: "/agents",        label: "Agents",        icon: "◈" },
+  { href: "/conversations", label: "History",       icon: "◫" },
+  { href: "/plans",         label: "Plans",         icon: "◇" },
+  { href: "/invoices",      label: "Invoices",      icon: "◻" },
+  { href: "/api-keys",      label: "API Keys",      icon: "⌘" },
+  { href: "/profile",       label: "Profile",       icon: "◉" },
 ];
 
 function MenuIcon({ open }: { open: boolean }) {
@@ -38,7 +42,9 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
   const router = useRouter();
   const pathname = usePathname();
   const { toast } = useToast();
-  const [user, setUser] = useState<{ name: string; email: string } | null>(null);
+  const [user, setUser] = useState<AuthUser | null>(null);
+  const [emailVerified, setEmailVerified] = useState<boolean | null>(null);
+  const [resendingVerify, setResendingVerify] = useState(false);
   const [mobileOpen, setMobileOpen] = useState(false);
   const [collapsed, setCollapsed] = useState(false);
   const [showLogoutModal, setShowLogoutModal] = useState(false);
@@ -47,6 +53,14 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
     const u = getCurrentUser();
     if (!u) { router.replace("/login"); return; }
     setUser(u);
+    // Check email verification from localStorage cache
+    try {
+      const raw = localStorage.getItem("agentverse.user");
+      if (raw) {
+        const parsed = JSON.parse(raw);
+        setEmailVerified(parsed.emailVerified ?? null);
+      }
+    } catch { /* ignore */ }
     // Restore collapsed state
     const saved = localStorage.getItem(COLLAPSED_KEY);
     if (saved === "1") setCollapsed(true);
@@ -60,6 +74,19 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
       localStorage.setItem(COLLAPSED_KEY, c ? "0" : "1");
       return !c;
     });
+  }
+
+  async function handleResendVerify() {
+    if (resendingVerify) return;
+    setResendingVerify(true);
+    try {
+      await resendVerification();
+      toast("Verification email sent — check your inbox", "success");
+    } catch (err) {
+      toast(err instanceof Error ? err.message : "Failed to resend", "error");
+    } finally {
+      setResendingVerify(false);
+    }
   }
 
   function handleLogout() {
@@ -106,7 +133,10 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
 
         {/* Nav links */}
         <nav className="flex-1 space-y-1 p-2 mt-2 overflow-y-auto">
-          {NAV.map((item) => {
+          {[
+            ...NAV,
+            ...(user?.role === "ADMIN" ? [{ href: "/admin", label: "Admin", icon: "⚙" }] : []),
+          ].map((item) => {
             const active = pathname === item.href || pathname.startsWith(item.href + "/");
             return (
               <Link
@@ -203,6 +233,19 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
           </span>
         </header>
 
+        {/* Email verify banner */}
+        {emailVerified === false && (
+          <div className="flex items-center justify-between gap-3 border-b border-amber-400/20 bg-amber-400/[0.06] px-4 py-2 text-xs">
+            <span className="text-amber-200">Please verify your email to unlock all features.</span>
+            <button
+              onClick={handleResendVerify}
+              disabled={resendingVerify}
+              className="shrink-0 text-sky-200 hover:text-sky-100 transition disabled:opacity-50"
+            >
+              {resendingVerify ? "Sending…" : "Resend link"}
+            </button>
+          </div>
+        )}
         <main className="flex-1">
           {children}
         </main>

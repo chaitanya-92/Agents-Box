@@ -4,40 +4,49 @@ generator client {
 }
 
 datasource db {
-  provider = "postgresql"
-  url      = env("DATABASE_URL")
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
   directUrl = env("DIRECT_URL")
 }
 
 model User {
-  id              String   @id @default(cuid())
-  name            String
-  email           String   @unique
-  passwordHash    String?
-  avatarUrl       String?
-  role            String   @default("USER")
-  googleId        String?  @unique
-  phone           String?
-  refreshToken    String?
-  createdAt       DateTime @default(now())
-  updatedAt       DateTime @updatedAt
-  subscriptions   Subscription[]
-  payments        Payment[]
-  usageLogs       AgentUsage[]
+  id                  String        @id @default(cuid())
+  name                String
+  email               String        @unique
+  passwordHash        String?
+  avatarUrl           String?
+  role                String        @default("USER")
+  googleId            String?       @unique
+  phone               String?
+  refreshToken        String?
+  emailVerified       Boolean       @default(false)
+  verificationToken   String?       @unique
+  verificationExpiry  DateTime?
+  resetToken          String?       @unique
+  resetTokenExpiry    DateTime?
+  trialEndsAt         DateTime?
+  gstin               String?
+  createdAt           DateTime      @default(now())
+  updatedAt           DateTime      @updatedAt
+  subscriptions       Subscription[]
+  payments            Payment[]
+  usageLogs           AgentUsage[]
+  apiKeys             ApiKey[]
+  conversations       Conversation[]
 }
 
 model Subscription {
-  id                    String   @id @default(cuid())
-  userId                String
-  planId                String
-  status                String   @default("PENDING")
-  razorpayCustomerId    String?
-  razorpaySubscriptionId String?  @unique
-  currentPeriodStart    DateTime?
-  currentPeriodEnd      DateTime?
-  createdAt             DateTime @default(now())
-  updatedAt             DateTime @updatedAt
-  user                  User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  id                     String    @id @default(cuid())
+  userId                 String
+  planId                 String
+  status                 String    @default("PENDING")
+  razorpayCustomerId     String?
+  razorpaySubscriptionId String?   @unique
+  currentPeriodStart     DateTime?
+  currentPeriodEnd       DateTime?
+  createdAt              DateTime  @default(now())
+  updatedAt              DateTime  @updatedAt
+  user                   User      @relation(fields: [userId], references: [id], onDelete: Cascade)
 }
 
 model Payment {
@@ -57,13 +66,37 @@ model Payment {
 }
 
 model AgentUsage {
-  id         String   @id @default(cuid())
-  userId     String
-  agentId    String
-  units      Int      @default(1)
-  metadata   String?
-  createdAt  DateTime @default(now())
-  user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  id        String   @id @default(cuid())
+  userId    String
+  agentId   String
+  units     Int      @default(1)
+  metadata  String?
+  createdAt DateTime @default(now())
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, agentId])
+}
+
+model ApiKey {
+  id        String    @id @default(cuid())
+  userId    String
+  name      String
+  keyHash   String    @unique
+  prefix    String
+  lastUsed  DateTime?
+  createdAt DateTime  @default(now())
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model Conversation {
+  id        String   @id @default(cuid())
+  userId    String
+  agentId   String
+  title     String   @default("New conversation")
+  messages  Json     @default("[]")
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@index([userId, agentId])
 }

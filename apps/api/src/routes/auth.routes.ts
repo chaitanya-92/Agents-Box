@@ -5,13 +5,20 @@ import { failure, success } from "@/lib/api-response";
 import { isGoogleOAuthConfigured } from "@/lib/oauth";
 import { passport } from "@/modules/auth/google.strategy";
 import { authenticate } from "@/middleware/authenticate";
-import { googleCallback, login, me, register } from "@/modules/auth/auth.controller";
+import {
+  googleCallback, login, me, register,
+  verifyEmail, resendVerification, forgotPassword, resetPassword,
+} from "@/modules/auth/auth.controller";
 
 export const authRouter = Router();
 
 authRouter.post("/register", register);
 authRouter.post("/login", login);
 authRouter.get("/me", authenticate, me);
+authRouter.get("/verify-email", verifyEmail);
+authRouter.post("/resend-verification", authenticate, resendVerification);
+authRouter.post("/forgot-password", forgotPassword);
+authRouter.post("/reset-password", resetPassword);
 authRouter.get("/providers", (_req, res) => {
   res.status(StatusCodes.OK).json(
     success({

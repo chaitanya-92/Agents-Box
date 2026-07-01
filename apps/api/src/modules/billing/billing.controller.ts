@@ -48,6 +48,22 @@ export async function verifyPayment(req: Request, res: Response, next: NextFunct
   } catch (err) { next(err); }
 }
 
+export async function listInvoices(req: Request, res: Response, next: NextFunction) {
+  try {
+    if (!req.user) return res.status(StatusCodes.UNAUTHORIZED).json(failure("Authentication required"));
+    const invoices = await prisma.payment.findMany({
+      where: { userId: req.user.id, status: "CAPTURED" },
+      orderBy: { createdAt: "desc" },
+      select: {
+        id: true, amount: true, currency: true,
+        razorpayPaymentId: true, razorpayOrderId: true,
+        createdAt: true, metadata: true,
+      },
+    });
+    return res.status(StatusCodes.OK).json(success(invoices));
+  } catch (err) { next(err); }
+}
+
 export async function handleWebhook(req: Request, res: Response, next: NextFunction) {
   try {
     const signature = req.headers["x-razorpay-signature"];

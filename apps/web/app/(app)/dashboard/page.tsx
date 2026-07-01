@@ -1,11 +1,12 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useState } from "react";
+import { Suspense, useEffect, useState } from "react";
 import { agentCatalog, pricingPlans } from "@agentverse/config";
 import { type Subscription, type UsageStats, getMySubscription, getUsageStats } from "@/lib/api";
 import { getCurrentUser } from "@/lib/auth";
 import { useToast } from "@/components/ui/toast";
+import { OauthSessionSync } from "@/components/auth/oauth-session-sync";
 
 function Skeleton({ className }: { className?: string }) {
   return <div className={`skeleton ${className ?? ""}`} />;
@@ -96,6 +97,10 @@ export default function DashboardPage() {
 
   return (
     <div className="mx-auto max-w-6xl px-4 sm:px-6 py-8 sm:py-10">
+      {/* Sync OAuth session tokens from Google redirect query params */}
+      <Suspense fallback={null}>
+        <OauthSessionSync />
+      </Suspense>
 
       {/* Upgrade nudge */}
       {showUpgradeNudge && (

@@ -18,7 +18,17 @@ export async function createOrder(req: Request, res: Response, next: NextFunctio
     if (!plan) return res.status(StatusCodes.BAD_REQUEST).json(failure("Invalid pricing plan"));
     const order = await createRazorpayOrder(req.user.id, plan.monthlyPrice * 100, payload.planId);
     return res.status(StatusCodes.CREATED).json(success(order, "Order created"));
-  } catch (err) { next(err); }
+  } catch (err: unknown) {
+    // Log Razorpay errors clearly so they appear in Render logs
+    const rzpErr = err as { statusCode?: number; error?: { description?: string; code?: string } };
+    if (rzpErr?.error?.description) {
+      console.error("[billing] Razorpay error:", rzpErr.statusCode, rzpErr.error.description);
+      return res.status(StatusCodes.BAD_GATEWAY).json(
+        failure(`Payment gateway error: ${rzpErr.error.description}`)
+      );
+    }
+    next(err);
+  }
 }
 
 export async function verifyPayment(req: Request, res: Response, next: NextFunction) {

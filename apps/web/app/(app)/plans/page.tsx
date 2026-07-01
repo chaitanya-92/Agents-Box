@@ -66,12 +66,15 @@ function PlanCard({ plan, currentPlanId, onPay }: { plan: PricingPlan; currentPl
 export default function PlansPage() {
   const [sub, setSub] = useState<Subscription | null | undefined>(undefined);
   const [status, setStatus] = useState<string | null>(null);
+  const [paying, setPaying] = useState(false);
 
   useEffect(() => {
     getMySubscription().then((r) => setSub(r.data)).catch(() => setSub(null));
   }, []);
 
   async function handlePay(plan: PricingPlan) {
+    if (paying) return;
+    setPaying(true);
     const user = getCurrentUser();
     if (!user) { window.location.href = "/login"; return; }
 
@@ -118,8 +121,10 @@ export default function PlansPage() {
       });
       rzp.open();
       setStatus(null);
+      setPaying(false);
     } catch (err) {
       setStatus(err instanceof Error ? err.message : "Checkout failed");
+      setPaying(false);
     }
   }
 
@@ -145,6 +150,7 @@ export default function PlansPage() {
             key={plan.id}
             plan={plan}
             currentPlanId={sub?.planId}
+            paying={paying}
             onPay={handlePay}
           />
         ))}

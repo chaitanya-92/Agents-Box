@@ -14,3 +14,7 @@ prisma/dev.db
 packages/*/dist
 .env.deploy
 fix-razorpay-keys.mjs
+*.mjs
+*.sh
+render.yaml
+do-it.mjs

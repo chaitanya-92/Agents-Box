@@ -198,8 +198,12 @@ async function downloadPDF(receipt: Receipt, billing: BillingProfile | null) {
   const fmt = (n: number) => `Rs. ${n.toLocaleString("en-IN", { minimumFractionDigits: 2 })}`;
 
   // Table header
-  const colW = [80, 22, 22, 22, 24];
-  const colX = [margin, margin + colW[0], margin + colW[0] + colW[1], margin + colW[0] + colW[1] + colW[2], margin + colW[0] + colW[1] + colW[2] + colW[3]];
+  const c0 = margin;
+  const c1 = margin + 80;
+  const c2 = margin + 102;
+  const c3 = margin + 124;
+  const c4 = margin + 146;
+  const colX = [c0, c1, c2, c3, c4];
   const rowH = 9;
 
   doc.setFillColor(...navy);
@@ -218,12 +222,12 @@ async function downloadPDF(receipt: Receipt, billing: BillingProfile | null) {
   doc.setTextColor(...dark);
   doc.setFont("helvetica", "normal");
   doc.setFontSize(7.5);
-  doc.text(`${receipt.planName} Plan — Monthly`, colX[0]! + 2, y + 6);
-  doc.text("998315", colX[1]! + 2, y + 6);
-  doc.text(fmt(baseAmt), colX[2]! + 2, y + 6);
-  doc.text(fmt(gstAmt), colX[3]! + 2, y + 6);
+  doc.text(`${receipt.planName} Plan — Monthly`, c0 + 2, y + 6);
+  doc.text("998315", c1 + 2, y + 6);
+  doc.text(fmt(baseAmt), c2 + 2, y + 6);
+  doc.text(fmt(gstAmt), c3 + 2, y + 6);
   doc.setFont("helvetica", "bold");
-  doc.text(fmt(totalPaid), colX[4]! + 2, y + 6);
+  doc.text(fmt(totalPaid), c4 + 2, y + 6);
   y += rowH;
 
   // Subtotals

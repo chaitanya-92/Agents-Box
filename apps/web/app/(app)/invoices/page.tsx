@@ -144,14 +144,15 @@ function downloadInvoicePDF(invoice: Invoice, profile: UserProfile | null, billi
     const planName = meta.planName ?? "Subscription";
 
     // Line item header
-    const colX = [margin, margin + 80, margin + 102, margin + 124, margin + 146];
+    const ic0 = margin, ic1 = margin + 80, ic2 = margin + 102, ic3 = margin + 124, ic4 = margin + 146;
+    const colX = [ic0, ic1, ic2, ic3, ic4];
     const rowH = 9;
     doc.setFillColor(...navy);
     doc.rect(margin, y, W - margin * 2, rowH, "F");
     doc.setTextColor(255, 255, 255);
     doc.setFont("helvetica", "bold");
     doc.setFontSize(7.5);
-    ["Description", "HSN/SAC", "Rate", "GST 18%", "Amount"].forEach((h, i) => doc.text(h, colX[i]! + 2, y + 6));
+    (["Description", "HSN/SAC", "Rate", "GST 18%", "Amount"] as const).forEach((h, i) => doc.text(h, colX[i] + 2, y + 6));
     y += rowH;
 
     // Line item row
@@ -160,12 +161,12 @@ function downloadInvoicePDF(invoice: Invoice, profile: UserProfile | null, billi
     doc.setTextColor(...dark);
     doc.setFont("helvetica", "normal");
     doc.setFontSize(7.5);
-    doc.text(`${planName} Plan — Monthly`, colX[0]! + 2, y + 6);
-    doc.text("998315", colX[1]! + 2, y + 6);
-    doc.text(fmt(baseAmt), colX[2]! + 2, y + 6);
-    doc.text(fmt(gstAmt), colX[3]! + 2, y + 6);
+    doc.text(`${planName} Plan — Monthly`, ic0 + 2, y + 6);
+    doc.text("998315", ic1 + 2, y + 6);
+    doc.text(fmt(baseAmt), ic2 + 2, y + 6);
+    doc.text(fmt(gstAmt), ic3 + 2, y + 6);
     doc.setFont("helvetica", "bold");
-    doc.text(fmt(totalPaid), colX[4]! + 2, y + 6);
+    doc.text(fmt(totalPaid), ic4 + 2, y + 6);
     y += rowH;
 
     // Subtotals

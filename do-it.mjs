@@ -37,7 +37,7 @@ async function main() {
   // Never use git add -A — secrets like .env.deploy must stay out of git
   run("git add apps/api/start.cjs apps/api/src/app.ts apps/api/src/modules/billing/billing.service.ts apps/web/lib/api.ts apps/web/components/marketing/auth-form.tsx packages/config/plans.ts prisma/migrations/20240101000000_init/migration.sql do-it.mjs");
   try {
-    run('git commit -m "fix: razorpay receipt length, auth form rewrite, cors *, stable JWT"');
+    run('git commit -m "fix: auth 401 not swallowed, razorpay receipt, cors *, stable JWT"');
     console.log("   ✅ Committed");
   } catch { console.log("   (nothing new to commit)"); }
 

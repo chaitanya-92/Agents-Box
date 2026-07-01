@@ -14,8 +14,8 @@ async function request<T>(path: string, options: RequestOptions = {}) {
     body: options.body ? JSON.stringify(options.body) : undefined
   });
 
-  // JWT expired / invalid — clear session and redirect to login
-  if (response.status === 401) {
+  // JWT expired — redirect to login (but NOT for auth endpoints, which return 401 on bad credentials)
+  if (response.status === 401 && !path.startsWith("/auth/")) {
     clearAuthSession();
     if (typeof window !== "undefined") window.location.href = "/login";
     throw new Error("Session expired. Please log in again.");

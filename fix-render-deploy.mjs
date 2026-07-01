@@ -19,7 +19,7 @@ async function api(method, path, body) {
   });
   const text = await res.text();
   if (!res.ok) throw new Error(`${res.status}: ${text}`);
-  return JSON.parse(text);
+  return text ? JSON.parse(text) : {};
 }
 
 async function main() {

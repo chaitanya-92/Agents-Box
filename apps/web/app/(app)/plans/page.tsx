@@ -1,6 +1,7 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { Suspense, useEffect, useRef, useState } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
 import { pricingPlans, type PricingPlan } from "@agentverse/config";
 import {
   createPricingOrder, getBillingProfile, getMySubscription,
@@ -394,26 +395,69 @@ function PlanCard({ plan, currentPlanId, onPay }: { plan: PricingPlan; currentPl
   );
 }
 
-export default function PlansPage() {
+function PlansPageInner() {
   const { toast } = useToast();
+  const router = useRouter();
+  const searchParams = useSearchParams();
   const [sub, setSub] = useState<Subscription | null | undefined>(undefined);
   const [status, setStatus] = useState<string | null>(null);
   const [paying, setPaying] = useState(false);
   const [receipt, setReceipt] = useState<Receipt | null>(null);
   const [billingModal, setBillingModal] = useState<{ plan: PricingPlan } | null>(null);
   const [billingProfile, setBillingProfile] = useState<BillingProfile | null>(null);
+  const [downgradeConfirm, setDowngradeConfirm] = useState<{ plan: PricingPlan } | null>(null);
   const paymentHandled = useRef(false);
 
+  // Plan order for downgrade detection
+  const PLAN_RANK: Record<string, number> = { starter: 0, pro: 1, scale: 2 };
+
   useEffect(() => {
-    getMySubscription().then((r) => setSub(r.data)).catch(() => setSub(null));
-    getBillingProfile().then((r) => setBillingProfile(r.data)).catch(() => {});
+    Promise.all([
+      getMySubscription().then((r) => setSub(r.data)).catch(() => setSub(null)),
+      getBillingProfile().then((r) => setBillingProfile(r.data)).catch(() => {}),
+    ]).then(() => {
+      // Auto-open billing modal if redirected from marketing page with ?plan=
+      const planId = searchParams.get("plan");
+      if (planId) {
+        const plan = pricingPlans.find(p => p.id === planId);
+        if (plan) {
+          // Small delay to let subscription load first
+          setTimeout(() => handlePay(plan), 300);
+        }
+      }
+    });
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   async function handlePay(plan: PricingPlan) {
     if (paying) return;
     const user = getCurrentUser();
-    if (!user) { window.location.href = "/login"; return; }
-    // Show billing details modal first
+    if (!user) {
+      router.push(`/login?redirect=/plans?plan=${plan.id}`);
+      return;
+    }
+
+    // Validation: already on this plan
+    if (sub?.planId === plan.id && sub?.status === "ACTIVE") {
+      toast(`You're already on the ${plan.name} plan.`, "error");
+      return;
+    }
+
+    // Validation: downgrade warning
+    const currentRank = PLAN_RANK[sub?.planId ?? ""] ?? -1;
+    const newRank = PLAN_RANK[plan.id] ?? 0;
+    if (sub?.status === "ACTIVE" && newRank < currentRank) {
+      setDowngradeConfirm({ plan });
+      return;
+    }
+
+    // Validation: Razorpay configured
+    if (!publicEnv.razorpayKeyId) {
+      toast("Payment gateway not configured. Contact support.", "error");
+      return;
+    }
+
+    // Show billing details modal
     setBillingModal({ plan });
   }
 
@@ -493,10 +537,13 @@ export default function PlansPage() {
     }
   }
 
+  const capturedBillingPlan = billingModal?.plan;
+
   return (
     <main className="mx-auto max-w-6xl px-4 sm:px-6 py-8 sm:py-10">
       {receipt && <ReceiptModal receipt={receipt} billing={billingProfile} onClose={() => setReceipt(null)} />}
-      {billingModal && (
+
+      {capturedBillingPlan && (
         <BillingDetailsModal
           initial={billingProfile}
           userName={getCurrentUser()?.name ?? ""}
@@ -504,10 +551,36 @@ export default function PlansPage() {
           onConfirm={(profile) => {
             setBillingProfile(profile);
             setBillingModal(null);
-            openRazorpay(billingModal.plan, profile);
+            openRazorpay(capturedBillingPlan, profile);
           }}
           onClose={() => setBillingModal(null)}
         />
+      )}
+
+      {/* Downgrade confirmation */}
+      {downgradeConfirm && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm px-4">
+          <div className="w-full max-w-sm border border-amber-400/20 bg-[#0a0f1a] p-7 animate-fade-up">
+            <p className="text-amber-300 text-lg mb-1">⚠ Downgrade plan?</p>
+            <p className="text-sm text-white/60 mb-6">
+              You&apos;re switching to the <strong className="text-white">{downgradeConfirm.plan.name}</strong> plan which has fewer credits and features than your current plan. Your new plan takes effect immediately.
+            </p>
+            <div className="flex gap-3">
+              <button
+                onClick={() => { const p = downgradeConfirm.plan; setDowngradeConfirm(null); setBillingModal({ plan: p }); }}
+                className="flex-1 border border-amber-400/30 bg-amber-400/10 py-2.5 text-sm text-amber-300 hover:bg-amber-400/20 transition"
+              >
+                Yes, downgrade
+              </button>
+              <button
+                onClick={() => setDowngradeConfirm(null)}
+                className="flex-1 border border-white/15 py-2.5 text-sm text-white/60 hover:text-white transition"
+              >
+                Cancel
+              </button>
+            </div>
+          </div>
+        </div>
       )}
 
       <div className="mb-8">
@@ -543,5 +616,23 @@ export default function PlansPage() {
         </p>
       )}
     </main>
+  );
+}
+
+export default function PlansPage() {
+  return (
+    <Suspense fallback={
+      <main className="mx-auto max-w-6xl px-4 sm:px-6 py-8 sm:py-10">
+        <div className="mb-8">
+          <p className="section-label">Billing</p>
+          <h1 className="mt-2 font-[var(--font-pixel)] text-2xl sm:text-3xl text-white">Choose your plan</h1>
+        </div>
+        <div className="grid gap-4 sm:gap-6 sm:grid-cols-2 lg:grid-cols-3">
+          {[1,2,3].map(i => <div key={i} className="pixel-panel h-80 skeleton" />)}
+        </div>
+      </main>
+    }>
+      <PlansPageInner />
+    </Suspense>
   );
 }

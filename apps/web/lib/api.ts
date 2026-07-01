@@ -1,8 +1,16 @@
 import { publicEnv } from "@/lib/env";
 import { clearAuthSession, getAccessToken } from "@/lib/auth";
 
-type ApiEnvelope<T> = { success: boolean; message: string; data: T };
+type ApiEnvelope<T> = { success: boolean; message: string; data: T; details?: Record<string, unknown> };
 type RequestOptions = { method?: "GET" | "POST" | "PUT" | "PATCH" | "DELETE"; body?: unknown; token?: string | null };
+
+/** Extends Error to carry structured details from the API (e.g. needsVerification, waitSeconds). */
+export class ApiError extends Error {
+  constructor(message: string, public readonly details?: Record<string, unknown>) {
+    super(message);
+    this.name = "ApiError";
+  }
+}
 
 async function request<T>(path: string, options: RequestOptions = {}) {
   const response = await fetch(`${publicEnv.apiUrl}${path}`, {
@@ -18,11 +26,13 @@ async function request<T>(path: string, options: RequestOptions = {}) {
   if (response.status === 401 && !path.startsWith("/auth/")) {
     clearAuthSession();
     if (typeof window !== "undefined") window.location.href = "/login";
-    throw new Error("Session expired. Please log in again.");
+    throw new ApiError("Session expired. Please log in again.");
   }
 
-  const payload = (await response.json()) as ApiEnvelope<T> & { details?: unknown };
-  if (!response.ok || !payload.success) throw new Error(payload.message || "Request failed");
+  const payload = (await response.json()) as ApiEnvelope<T>;
+  if (!response.ok || !payload.success) {
+    throw new ApiError(payload.message || "Request failed", payload.details);
+  }
   return payload;
 }
 
@@ -33,12 +43,23 @@ export type AuthResponse = {
   tokens: { accessToken: string; refreshToken: string };
 };
 
+/** Returns { email } only — no tokens until email is verified via OTP */
 export function registerUser(input: { name: string; email: string; password: string }) {
-  return request<AuthResponse>("/auth/register", { method: "POST", body: input });
+  return request<{ email: string }>("/auth/register", { method: "POST", body: input });
 }
 
 export function loginUser(input: { email: string; password: string }) {
   return request<AuthResponse>("/auth/login", { method: "POST", body: input });
+}
+
+/** Submit OTP entered by user. Returns full AuthResponse on success. */
+export function verifyOtp(email: string, otp: string) {
+  return request<AuthResponse>("/auth/verify-otp", { method: "POST", body: { email, otp } });
+}
+
+/** Resend OTP to email. Rate-limited to once per 60 s. */
+export function resendOtp(email: string) {
+  return request<null>("/auth/resend-otp", { method: "POST", body: { email } });
 }
 
 export function verifyEmail(token: string) {

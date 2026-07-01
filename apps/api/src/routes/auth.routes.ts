@@ -8,12 +8,15 @@ import { authenticate } from "@/middleware/authenticate";
 import {
   googleCallback, login, me, register,
   verifyEmail, resendVerification, forgotPassword, resetPassword,
+  verifyOtp, resendOtp,
 } from "@/modules/auth/auth.controller";
 
 export const authRouter = Router();
 
 authRouter.post("/register", register);
 authRouter.post("/login", login);
+authRouter.post("/verify-otp", verifyOtp);
+authRouter.post("/resend-otp", resendOtp);
 authRouter.get("/me", authenticate, me);
 authRouter.get("/verify-email", verifyEmail);
 authRouter.post("/resend-verification", authenticate, resendVerification);

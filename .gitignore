@@ -12,3 +12,5 @@ prisma/dev.db
 *.tsbuildinfo
 .vercel
 packages/*/dist
+.env.deploy
+fix-razorpay-keys.mjs

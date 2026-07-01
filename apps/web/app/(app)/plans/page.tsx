@@ -1,11 +1,15 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { pricingPlans, type PricingPlan } from "@agentverse/config";
-import { createPricingOrder, getMySubscription, type Subscription, verifyPricingPayment } from "@/lib/api";
+import {
+  createPricingOrder, getBillingProfile, getMySubscription,
+  type BillingProfile, type Subscription, verifyPricingPayment,
+} from "@/lib/api";
 import { getCurrentUser } from "@/lib/auth";
 import { publicEnv } from "@/lib/env";
 import { useToast } from "@/components/ui/toast";
+import { BillingDetailsModal } from "@/components/billing/billing-details-modal";
 
 declare global {
   interface Window {
@@ -17,10 +21,11 @@ declare global {
 
 type Receipt = {
   planName: string;
-  amount: number;
+  amount: number;       // in rupees
   currency: string;
   orderId: string;
   paymentId: string;
+  invoiceNumber?: string | null;
   date: string;
   userName: string;
   userEmail: string;
@@ -48,130 +53,238 @@ async function loadJsPDF(): Promise<boolean> {
   });
 }
 
-async function downloadPDF(receipt: Receipt) {
+async function downloadPDF(receipt: Receipt, billing: BillingProfile | null) {
   const ok = await loadJsPDF();
-  if (!ok || !window.jspdf) {
-    // Fallback: print-to-PDF
-    window.print();
-    return;
-  }
+  if (!ok || !window.jspdf) { window.print(); return; }
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const { jsPDF } = window.jspdf as any;
   const doc = new jsPDF({ unit: "mm", format: "a4" });
 
-  const W = 210;
-  const margin = 20;
-  let y = 20;
+  // ── Palette ───────────────────────────────────────────────────────────
+  const navy  = [15, 23, 42];
+  const blue  = [14, 165, 233];
+  const dark  = [30, 41, 59];
+  const grey  = [100, 116, 139];
+  const light = [241, 245, 249];
+  const green = [22, 163, 74];
+  const W = 210, margin = 20;
 
-  // Background
-  doc.setFillColor(13, 20, 36);
+  // White background
+  doc.setFillColor(255, 255, 255);
   doc.rect(0, 0, W, 297, "F");
 
-  // Header stripe
-  doc.setFillColor(10, 25, 50);
-  doc.rect(0, 0, W, 40, "F");
-
-  // Logo
-  doc.setTextColor(186, 230, 255);
-  doc.setFontSize(16);
+  // ── Header bar ───────────────────────────────────────────────────────
+  doc.setFillColor(...navy);
+  doc.rect(0, 0, W, 42, "F");
+  doc.setTextColor(255, 255, 255);
   doc.setFont("helvetica", "bold");
-  doc.text("AGENTVERSE AI", margin, y + 8);
-
-  doc.setFontSize(8);
-  doc.setFont("helvetica", "normal");
-  doc.setTextColor(120, 140, 160);
-  doc.text("PAYMENT RECEIPT", margin, y + 16);
-
-  // Receipt ID (top right)
-  doc.setFontSize(7);
-  doc.setTextColor(100, 120, 140);
-  doc.text(`Receipt: ${receipt.paymentId.slice(-8).toUpperCase()}`, W - margin, y + 8, { align: "right" });
-  doc.text(receipt.date, W - margin, y + 15, { align: "right" });
-
-  y = 55;
-
-  // Success badge
-  doc.setFillColor(16, 185, 129, 15);
-  doc.setDrawColor(16, 185, 129);
-  doc.roundedRect(margin, y, 55, 9, 2, 2, "FD");
-  doc.setTextColor(52, 211, 153);
-  doc.setFontSize(8);
-  doc.setFont("helvetica", "bold");
-  doc.text("✓  PAYMENT SUCCESSFUL", margin + 4, y + 6);
-
-  y += 22;
-
-  // Plan box
-  doc.setFillColor(20, 35, 60);
-  doc.setDrawColor(50, 80, 120);
-  doc.rect(margin, y, W - margin * 2, 28, "FD");
-  doc.setTextColor(120, 160, 200);
-  doc.setFontSize(7);
-  doc.setFont("helvetica", "normal");
-  doc.text("ACTIVE PLAN", margin + 6, y + 9);
-  doc.setTextColor(186, 230, 255);
   doc.setFontSize(18);
-  doc.setFont("helvetica", "bold");
-  doc.text(receipt.planName, margin + 6, y + 22);
-  doc.setTextColor(100, 200, 140);
-  doc.setFontSize(14);
-  doc.text(`Rs.${receipt.amount.toLocaleString("en-IN")}`, W - margin - 6, y + 22, { align: "right" });
-
-  y += 40;
-
-  // Receipt table
-  doc.setFontSize(7);
+  doc.text("AgentVerse AI", margin, 18);
   doc.setFont("helvetica", "normal");
-  doc.setTextColor(120, 140, 160);
-  doc.text("PAYMENT DETAILS", margin, y);
+  doc.setFontSize(8);
+  doc.setTextColor(148, 163, 184);
+  doc.text("One Platform. Unlimited AI Agents.", margin, 26);
+  doc.setTextColor(255, 255, 255);
+  doc.setFont("helvetica", "bold");
+  doc.setFontSize(10);
+  doc.text("INVOICE", W - margin, 18, { align: "right" });
+  doc.setFont("helvetica", "normal");
+  doc.setFontSize(8);
+  doc.setTextColor(148, 163, 184);
+  doc.text(receipt.date, W - margin, 26, { align: "right" });
+
+  // ── Title + Invoice meta ───────────────────────────────────────────────
+  let y = 52;
+  doc.setTextColor(...dark);
+  doc.setFont("helvetica", "bold");
+  doc.setFontSize(18);
+  doc.text("TAX INVOICE", margin, y);
+  doc.setDrawColor(...blue);
+  doc.setLineWidth(0.8);
+  doc.line(margin, y + 3, margin + 46, y + 3);
+
+  // Invoice number & date (top right)
+  doc.setFont("helvetica", "normal");
+  doc.setFontSize(8.5);
+  doc.setTextColor(...grey);
+  doc.text("Invoice No.", W - margin - 55, y - 4);
+  doc.setTextColor(...dark);
+  doc.setFont("helvetica", "bold");
+  doc.text(receipt.invoiceNumber ?? "—", W - margin, y - 4, { align: "right" });
+  doc.setFont("helvetica", "normal");
+  doc.setTextColor(...grey);
+  doc.text("Invoice Date", W - margin - 55, y + 3);
+  doc.setTextColor(...dark);
+  doc.text(receipt.date, W - margin, y + 3, { align: "right" });
+
+  // SAC Code
+  doc.setTextColor(...grey);
+  doc.setFontSize(7.5);
+  doc.text("SAC Code: 998315 (SaaS / Cloud Software Services)", W - margin, y + 10, { align: "right" });
+
+  y += 18;
+
+  // ── Billed from (seller) + Billed to (buyer) side by side ─────────────
+  const col2 = W / 2 + 4;
+
+  // FROM
+  doc.setTextColor(...grey);
+  doc.setFont("helvetica", "normal");
+  doc.setFontSize(7.5);
+  doc.text("FROM", margin, y);
+  doc.setTextColor(...dark);
+  doc.setFont("helvetica", "bold");
+  doc.setFontSize(9.5);
+  doc.text("AgentVerse AI", margin, y + 7);
+  doc.setFont("helvetica", "normal");
+  doc.setFontSize(8);
+  doc.setTextColor(...grey);
+  doc.text("agentverse.ai", margin, y + 14);
+  doc.text("support@agentverse.ai", margin, y + 20);
+
+  // TO
+  doc.setTextColor(...grey);
+  doc.setFontSize(7.5);
+  doc.text("BILLED TO", col2, y);
+  doc.setTextColor(...dark);
+  doc.setFont("helvetica", "bold");
+  doc.setFontSize(9.5);
+  doc.text(billing?.companyName ?? receipt.userName, col2, y + 7);
+  doc.setFont("helvetica", "normal");
+  doc.setFontSize(8);
+  doc.setTextColor(...grey);
+  doc.text(receipt.userName, col2, y + 14);
+  doc.text(receipt.userEmail, col2, y + 20);
+  if (billing?.phone) doc.text(billing.phone, col2, y + 26);
+  y += 34;
+
+  // Address block
+  if (billing) {
+    const addr = [
+      billing.addressLine1,
+      billing.addressLine2,
+      `${billing.city}, ${billing.state} - ${billing.pinCode}`,
+    ].filter(Boolean).join(", ");
+    doc.setFontSize(8);
+    doc.setTextColor(...grey);
+    const addrLines = doc.splitTextToSize(addr, 80) as string[];
+    addrLines.forEach((line: string, i: number) => {
+      doc.text(line, col2, y + i * 5);
+    });
+    y += addrLines.length * 5 + 4;
+    if (billing.gstin) {
+      doc.setTextColor(...dark);
+      doc.setFont("helvetica", "bold");
+      doc.setFontSize(8);
+      doc.text(`GSTIN: ${billing.gstin}`, col2, y);
+      y += 5;
+    }
+    if (billing.pan) {
+      doc.setFont("helvetica", "normal");
+      doc.setFontSize(8);
+      doc.setTextColor(...grey);
+      doc.text(`PAN: ${billing.pan}`, col2, y);
+      y += 5;
+    }
+  }
   y += 6;
 
-  const rows = [
-    ["Customer Name",  receipt.userName],
-    ["Email Address",  receipt.userEmail],
-    ["Date",           receipt.date],
-    ["Plan",           receipt.planName],
-    ["Amount Paid",    `Rs.${receipt.amount.toLocaleString("en-IN")}`],
-    ["Payment ID",     receipt.paymentId],
-    ["Order ID",       receipt.orderId],
-  ];
+  // ── Line item table ────────────────────────────────────────────────────
+  // GST calculation: amount is base + 18% GST included (reverse calc)
+  const totalPaid = receipt.amount;
+  const baseAmt   = Math.round((totalPaid / 1.18) * 100) / 100;
+  const gstAmt    = Math.round((totalPaid - baseAmt) * 100) / 100;
+  const fmt = (n: number) => `Rs. ${n.toLocaleString("en-IN", { minimumFractionDigits: 2 })}`;
 
-  rows.forEach(([label, value], i) => {
-    const bg = i % 2 === 0 ? [18, 28, 50] : [14, 22, 40];
-    doc.setFillColor(...bg as [number, number, number]);
-    doc.rect(margin, y, W - margin * 2, 9, "F");
-    doc.setTextColor(140, 160, 185);
-    doc.setFontSize(7.5);
+  // Table header
+  const colW = [80, 22, 22, 22, 24];
+  const colX = [margin, margin + colW[0], margin + colW[0] + colW[1], margin + colW[0] + colW[1] + colW[2], margin + colW[0] + colW[1] + colW[2] + colW[3]];
+  const rowH = 9;
+
+  doc.setFillColor(...navy);
+  doc.rect(margin, y, W - margin * 2, rowH, "F");
+  doc.setTextColor(255, 255, 255);
+  doc.setFont("helvetica", "bold");
+  doc.setFontSize(7.5);
+  ["Description", "HSN/SAC", "Rate", "GST 18%", "Amount"].forEach((h, i) => {
+    doc.text(h, colX[i]! + 2, y + 6);
+  });
+  y += rowH;
+
+  // Row 1
+  doc.setFillColor(...light);
+  doc.rect(margin, y, W - margin * 2, rowH, "F");
+  doc.setTextColor(...dark);
+  doc.setFont("helvetica", "normal");
+  doc.setFontSize(7.5);
+  doc.text(`${receipt.planName} Plan — Monthly`, colX[0]! + 2, y + 6);
+  doc.text("998315", colX[1]! + 2, y + 6);
+  doc.text(fmt(baseAmt), colX[2]! + 2, y + 6);
+  doc.text(fmt(gstAmt), colX[3]! + 2, y + 6);
+  doc.setFont("helvetica", "bold");
+  doc.text(fmt(totalPaid), colX[4]! + 2, y + 6);
+  y += rowH;
+
+  // Subtotals
+  const subRows: [string, string][] = [
+    ["Subtotal (Base)", fmt(baseAmt)],
+    ["IGST @ 18%",      fmt(gstAmt)],
+  ];
+  subRows.forEach(([label, val]) => {
     doc.setFont("helvetica", "normal");
-    doc.text(label, margin + 4, y + 6);
-    doc.setTextColor(210, 220, 235);
-    doc.setFont("helvetica", i === 4 ? "bold" : "normal");
-    doc.text(value, W - margin - 4, y + 6, { align: "right" });
+    doc.setFontSize(8);
+    doc.setTextColor(...grey);
+    doc.text(label, W - margin - 60, y + 6);
+    doc.setTextColor(...dark);
+    doc.text(val, W - margin - 4, y + 6, { align: "right" });
     y += 9;
   });
 
-  y += 16;
+  // ── Total box ─────────────────────────────────────────────────────────
+  y += 2;
+  doc.setFillColor(...blue);
+  doc.rect(margin, y, W - margin * 2, 13, "F");
+  doc.setTextColor(255, 255, 255);
+  doc.setFont("helvetica", "bold");
+  doc.setFontSize(11);
+  doc.text("TOTAL PAID (incl. GST)", margin + 4, y + 9);
+  doc.setFontSize(12);
+  doc.text(fmt(totalPaid), W - margin - 4, y + 9, { align: "right" });
 
-  // Footer
-  doc.setDrawColor(40, 60, 90);
-  doc.line(margin, y, W - margin, y);
-  y += 8;
-  doc.setTextColor(80, 100, 130);
-  doc.setFontSize(7);
+  // Payment reference
+  y += 18;
+  doc.setFontSize(7.5);
   doc.setFont("helvetica", "normal");
-  doc.text("AgentVerse AI  ·  agentverse-ai-web.vercel.app", W / 2, y, { align: "center" });
-  doc.text("This is a computer-generated receipt and does not require a signature.", W / 2, y + 6, { align: "center" });
+  doc.setTextColor(...grey);
+  doc.text(`Payment ID: ${receipt.paymentId}`, margin, y);
+  doc.text(`Order ID: ${receipt.orderId}`, margin, y + 6);
+  doc.setTextColor(...green);
+  doc.setFont("helvetica", "bold");
+  doc.text("STATUS: PAID", W - margin, y, { align: "right" });
+
+  // ── Footer ────────────────────────────────────────────────────────────
+  doc.setDrawColor(...light);
+  doc.setLineWidth(0.5);
+  doc.line(margin, 272, W - margin, 272);
+  doc.setTextColor(...grey);
+  doc.setFont("helvetica", "normal");
+  doc.setFontSize(8);
+  doc.text("Thank you for choosing AgentVerse AI.", margin, 279);
+  doc.text("For support: support@agentverse.ai", margin, 285);
+  doc.setFont("helvetica", "bold");
+  doc.setTextColor(...blue);
+  doc.text("agentverse.ai", W - margin, 285, { align: "right" });
 
   doc.save(`agentverse-receipt-${receipt.paymentId.slice(-8)}.pdf`);
 }
 
-function ReceiptModal({ receipt, onClose }: { receipt: Receipt; onClose: () => void }) {
+function ReceiptModal({ receipt, billing, onClose }: { receipt: Receipt; billing: BillingProfile | null; onClose: () => void }) {
   const [downloading, setDownloading] = useState(false);
 
   async function handleDownload() {
     setDownloading(true);
-    await downloadPDF(receipt).catch(() => {});
+    await downloadPDF(receipt, billing).catch(() => {});
     setDownloading(false);
   }
 
@@ -282,13 +395,26 @@ export default function PlansPage() {
   const [status, setStatus] = useState<string | null>(null);
   const [paying, setPaying] = useState(false);
   const [receipt, setReceipt] = useState<Receipt | null>(null);
+  const [billingModal, setBillingModal] = useState<{ plan: PricingPlan } | null>(null);
+  const [billingProfile, setBillingProfile] = useState<BillingProfile | null>(null);
+  const paymentHandled = useRef(false);
 
   useEffect(() => {
     getMySubscription().then((r) => setSub(r.data)).catch(() => setSub(null));
+    getBillingProfile().then((r) => setBillingProfile(r.data)).catch(() => {});
   }, []);
 
   async function handlePay(plan: PricingPlan) {
     if (paying) return;
+    const user = getCurrentUser();
+    if (!user) { window.location.href = "/login"; return; }
+    // Show billing details modal first
+    setBillingModal({ plan });
+  }
+
+  async function openRazorpay(plan: PricingPlan, billing: BillingProfile) {
+    if (paying) return;
+    paymentHandled.current = false;
     setPaying(true);
     const user = getCurrentUser();
     if (!user) { window.location.href = "/login"; return; }
@@ -313,16 +439,19 @@ export default function PlansPage() {
         name: "AgentVerse AI",
         description: `${plan.name} · monthly`,
         order_id: order.id,
-        prefill: { name: user.name, email: user.email },
+        prefill: { name: user.name, email: user.email, contact: billing.phone },
         theme: { color: "#b9e6ff" },
         handler: async (response: {
           razorpay_order_id: string;
           razorpay_payment_id: string;
           razorpay_signature: string;
         }) => {
+          // Guard against Razorpay calling handler more than once
+          if (paymentHandled.current) return;
+          paymentHandled.current = true;
           setStatus("Verifying payment…");
           try {
-            await verifyPricingPayment({
+            const verified = await verifyPricingPayment({
               planId: plan.id,
               razorpayOrderId: response.razorpay_order_id,
               razorpayPaymentId: response.razorpay_payment_id,
@@ -334,6 +463,8 @@ export default function PlansPage() {
               currency: order.currency,
               orderId: response.razorpay_order_id,
               paymentId: response.razorpay_payment_id,
+              // eslint-disable-next-line @typescript-eslint/no-explicit-any
+              invoiceNumber: (verified as any)?.data?.invoiceNumber ?? null,
               date: new Date().toLocaleDateString("en-IN", { year: "numeric", month: "long", day: "numeric" }),
               userName: user.name,
               userEmail: user.email,
@@ -359,7 +490,20 @@ export default function PlansPage() {
 
   return (
     <main className="mx-auto max-w-6xl px-4 sm:px-6 py-8 sm:py-10">
-      {receipt && <ReceiptModal receipt={receipt} onClose={() => setReceipt(null)} />}
+      {receipt && <ReceiptModal receipt={receipt} billing={billingProfile} onClose={() => setReceipt(null)} />}
+      {billingModal && (
+        <BillingDetailsModal
+          initial={billingProfile}
+          userName={getCurrentUser()?.name ?? ""}
+          userEmail={getCurrentUser()?.email ?? ""}
+          onConfirm={(profile) => {
+            setBillingProfile(profile);
+            setBillingModal(null);
+            openRazorpay(billingModal.plan, profile);
+          }}
+          onClose={() => setBillingModal(null)}
+        />
+      )}
 
       <div className="mb-8">
         <p className="section-label">Billing</p>

@@ -117,10 +117,32 @@ export type Invoice = {
   razorpayOrderId: string | null;
   createdAt: string;
   metadata: string | null;
+  invoiceNumber: string | null;
 };
 
 export function getInvoices() {
   return request<Invoice[]>("/billing/invoices", { token: getAccessToken() });
+}
+
+export type BillingProfile = {
+  id?: string;
+  companyName?: string | null;
+  gstin?: string | null;
+  pan?: string | null;
+  phone: string;
+  addressLine1: string;
+  addressLine2?: string | null;
+  city: string;
+  state: string;
+  pinCode: string;
+};
+
+export function getBillingProfile() {
+  return request<BillingProfile | null>("/billing/billing-profile", { token: getAccessToken() });
+}
+
+export function saveBillingProfile(data: BillingProfile) {
+  return request<BillingProfile>("/billing/billing-profile", { method: "PUT", body: data, token: getAccessToken() });
 }
 
 // ─── User Profile ─────────────────────────────────────────────────────────────

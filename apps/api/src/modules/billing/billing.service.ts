@@ -61,12 +61,19 @@ export async function verifyAndCapturePayment(input: {
     throw new Error("Invalid plan selected");
   }
 
+  // Generate sequential invoice number: INV-YYYY-XXXXXX
+  const year = new Date().getFullYear();
+  const seqResult = await prisma.$queryRaw<[{ nextval: bigint }]>`SELECT nextval('invoice_number_seq')`;
+  const seq = Number(seqResult[0]?.nextval ?? 1000).toString().padStart(6, "0");
+  const invoiceNumber = `INV-${year}-${seq}`;
+
   await prisma.payment.update({
     where: { razorpayOrderId: input.razorpayOrderId },
     data: {
       razorpayPaymentId: input.razorpayPaymentId,
       razorpaySignature: input.razorpaySignature,
-      status: PAYMENT_STATUS.CAPTURED
+      status: PAYMENT_STATUS.CAPTURED,
+      invoiceNumber,
     }
   });
 

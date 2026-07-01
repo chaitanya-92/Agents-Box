@@ -57,7 +57,7 @@ export async function listInvoices(req: Request, res: Response, next: NextFuncti
       select: {
         id: true, amount: true, currency: true,
         razorpayPaymentId: true, razorpayOrderId: true,
-        createdAt: true, metadata: true,
+        createdAt: true, metadata: true, invoiceNumber: true,
       },
     });
     return res.status(StatusCodes.OK).json(success(invoices));

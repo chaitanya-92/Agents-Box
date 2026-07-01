@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { getInvoices, getProfile, type Invoice, type UserProfile } from "@/lib/api";
+import { getBillingProfile, getInvoices, getProfile, type BillingProfile, type Invoice, type UserProfile } from "@/lib/api";
 import { useToast } from "@/components/ui/toast";
 
 function Skeleton({ className }: { className?: string }) {
@@ -22,152 +22,189 @@ async function loadJsPDF() {
   return (window as unknown as Record<string, { jsPDF: unknown }>).jspdf?.jsPDF ?? null;
 }
 
-// Format amount — jsPDF built-in fonts don't support ₹, use "Rs." instead
-function fmtAmount(paise: number) {
-  return `Rs. ${(paise / 100).toLocaleString("en-IN", { minimumFractionDigits: 2 })}`;
-}
+const fmt = (rs: number) => `Rs. ${rs.toLocaleString("en-IN", { minimumFractionDigits: 2 })}`;
 
-function downloadInvoicePDF(invoice: Invoice, profile: UserProfile | null) {
+function downloadInvoicePDF(invoice: Invoice, profile: UserProfile | null, billing: BillingProfile | null) {
   loadJsPDF().then((JsPDF) => {
     if (!JsPDF) return;
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const doc = new (JsPDF as any)({ unit: "mm", format: "a4" });
 
-    // ── Palette (white bg, dark text) ────────────────────────────────────
-    const navy   = [15, 23, 42];    // header bg
-    const blue   = [14, 165, 233];  // accent
-    const dark   = [30, 41, 59];    // strong text
-    const grey   = [100, 116, 139]; // muted text
-    const light  = [241, 245, 249]; // zebra row bg
-    const green  = [22, 163, 74];   // PAID badge
+    const navy  = [15, 23, 42];
+    const blue  = [14, 165, 233];
+    const dark  = [30, 41, 59];
+    const grey  = [100, 116, 139];
+    const light = [241, 245, 249];
+    const green = [22, 163, 74];
+    const W = 210, margin = 20;
 
-    const pageW = 210;
-    const margin = 20;
-
-    // White background
+    // White bg
     doc.setFillColor(255, 255, 255);
-    doc.rect(0, 0, pageW, 297, "F");
+    doc.rect(0, 0, W, 297, "F");
 
-    // ── Header bar ───────────────────────────────────────────────────────
+    // Header bar
     doc.setFillColor(...navy);
-    doc.rect(0, 0, pageW, 42, "F");
-
+    doc.rect(0, 0, W, 42, "F");
     doc.setTextColor(255, 255, 255);
     doc.setFont("helvetica", "bold");
     doc.setFontSize(18);
     doc.text("AgentVerse AI", margin, 18);
-
     doc.setFont("helvetica", "normal");
     doc.setFontSize(8);
     doc.setTextColor(148, 163, 184);
     doc.text("One Platform. Unlimited AI Agents.", margin, 26);
 
-    // INVOICE label top-right
-    doc.setTextColor(255, 255, 255);
-    doc.setFont("helvetica", "bold");
-    doc.setFontSize(10);
-    doc.text("INVOICE", pageW - margin, 18, { align: "right" });
+    const date = new Date(invoice.createdAt).toLocaleDateString("en-IN", { day: "numeric", month: "long", year: "numeric" });
 
-    const date = new Date(invoice.createdAt).toLocaleDateString("en-IN", {
-      day: "numeric", month: "long", year: "numeric"
-    });
-    doc.setFont("helvetica", "normal");
-    doc.setFontSize(8);
-    doc.setTextColor(148, 163, 184);
-    doc.text(date, pageW - margin, 26, { align: "right" });
-
-    // ── Title ─────────────────────────────────────────────────────────────
+    // Title + invoice meta
+    let y = 52;
     doc.setTextColor(...dark);
     doc.setFont("helvetica", "bold");
-    doc.setFontSize(20);
-    doc.text("Payment Receipt", margin, 60);
-
-    // Accent underline
+    doc.setFontSize(18);
+    doc.text("TAX INVOICE", margin, y);
     doc.setDrawColor(...blue);
     doc.setLineWidth(0.8);
-    doc.line(margin, 63, margin + 55, 63);
+    doc.line(margin, y + 3, margin + 46, y + 3);
 
-    // ── Billed to ─────────────────────────────────────────────────────────
-    let y = 76;
-    if (profile) {
-      doc.setTextColor(...grey);
+    doc.setFont("helvetica", "normal");
+    doc.setFontSize(8.5);
+    doc.setTextColor(...grey);
+    doc.text("Invoice No.", W - margin - 55, y - 4);
+    doc.setTextColor(...dark);
+    doc.setFont("helvetica", "bold");
+    doc.text(invoice.invoiceNumber ?? "—", W - margin, y - 4, { align: "right" });
+    doc.setFont("helvetica", "normal");
+    doc.setTextColor(...grey);
+    doc.text("Invoice Date", W - margin - 55, y + 3);
+    doc.setTextColor(...dark);
+    doc.text(date, W - margin, y + 3, { align: "right" });
+    doc.setFontSize(7.5);
+    doc.setTextColor(...grey);
+    doc.text("SAC Code: 998315 (SaaS / Cloud Software Services)", W - margin, y + 10, { align: "right" });
+    y += 18;
+
+    // From / To
+    const col2 = W / 2 + 4;
+    doc.setFontSize(7.5);
+    doc.setTextColor(...grey);
+    doc.setFont("helvetica", "normal");
+    doc.text("FROM", margin, y);
+    doc.setTextColor(...dark);
+    doc.setFont("helvetica", "bold");
+    doc.setFontSize(9.5);
+    doc.text("AgentVerse AI", margin, y + 7);
+    doc.setFont("helvetica", "normal");
+    doc.setFontSize(8);
+    doc.setTextColor(...grey);
+    doc.text("agentverse.ai", margin, y + 14);
+    doc.text("support@agentverse.ai", margin, y + 20);
+
+    doc.setFontSize(7.5);
+    doc.setTextColor(...grey);
+    doc.text("BILLED TO", col2, y);
+    doc.setTextColor(...dark);
+    doc.setFont("helvetica", "bold");
+    doc.setFontSize(9.5);
+    doc.text(billing?.companyName ?? profile?.name ?? "—", col2, y + 7);
+    doc.setFont("helvetica", "normal");
+    doc.setFontSize(8);
+    doc.setTextColor(...grey);
+    if (profile?.name) doc.text(profile.name, col2, y + 14);
+    if (profile?.email) doc.text(profile.email, col2, y + 20);
+    if (billing?.phone ?? profile?.phone) doc.text((billing?.phone ?? profile?.phone)!, col2, y + 26);
+    y += 34;
+
+    if (billing) {
+      const addr = [billing.addressLine1, billing.addressLine2, `${billing.city}, ${billing.state} - ${billing.pinCode}`].filter(Boolean).join(", ");
+      const addrLines = doc.splitTextToSize(addr, 80) as string[];
+      addrLines.forEach((line: string, i: number) => doc.text(line, col2, y + i * 5));
+      y += addrLines.length * 5 + 4;
+      if (billing.gstin) {
+        doc.setTextColor(...dark);
+        doc.setFont("helvetica", "bold");
+        doc.text(`GSTIN: ${billing.gstin}`, col2, y);
+        y += 5;
+      }
+      if (billing.pan) {
+        doc.setFont("helvetica", "normal");
+        doc.setTextColor(...grey);
+        doc.text(`PAN: ${billing.pan}`, col2, y);
+        y += 5;
+      }
+    }
+    y += 6;
+
+    // GST breakdown (amount stored in paise)
+    const totalPaid = invoice.amount / 100;
+    const baseAmt   = Math.round((totalPaid / 1.18) * 100) / 100;
+    const gstAmt    = Math.round((totalPaid - baseAmt) * 100) / 100;
+
+    let meta: Record<string, string> = {};
+    try { meta = JSON.parse(invoice.metadata ?? "{}"); } catch {}
+    const planName = meta.planName ?? "Subscription";
+
+    // Line item header
+    const colX = [margin, margin + 80, margin + 102, margin + 124, margin + 146];
+    const rowH = 9;
+    doc.setFillColor(...navy);
+    doc.rect(margin, y, W - margin * 2, rowH, "F");
+    doc.setTextColor(255, 255, 255);
+    doc.setFont("helvetica", "bold");
+    doc.setFontSize(7.5);
+    ["Description", "HSN/SAC", "Rate", "GST 18%", "Amount"].forEach((h, i) => doc.text(h, colX[i]! + 2, y + 6));
+    y += rowH;
+
+    // Line item row
+    doc.setFillColor(...light);
+    doc.rect(margin, y, W - margin * 2, rowH, "F");
+    doc.setTextColor(...dark);
+    doc.setFont("helvetica", "normal");
+    doc.setFontSize(7.5);
+    doc.text(`${planName} Plan — Monthly`, colX[0]! + 2, y + 6);
+    doc.text("998315", colX[1]! + 2, y + 6);
+    doc.text(fmt(baseAmt), colX[2]! + 2, y + 6);
+    doc.text(fmt(gstAmt), colX[3]! + 2, y + 6);
+    doc.setFont("helvetica", "bold");
+    doc.text(fmt(totalPaid), colX[4]! + 2, y + 6);
+    y += rowH;
+
+    // Subtotals
+    [["Subtotal (Base)", fmt(baseAmt)], ["IGST @ 18%", fmt(gstAmt)]].forEach(([label, val]) => {
       doc.setFont("helvetica", "normal");
       doc.setFontSize(8);
-      doc.text("BILLED TO", margin, y);
-
+      doc.setTextColor(...grey);
+      doc.text(label, W - margin - 60, y + 6);
       doc.setTextColor(...dark);
-      doc.setFont("helvetica", "bold");
-      doc.setFontSize(10);
-      doc.text(profile.name, margin, y + 7);
-
-      doc.setFont("helvetica", "normal");
-      doc.setFontSize(9);
-      doc.setTextColor(...grey);
-      doc.text(profile.email, margin, y + 14);
-      if (profile.phone) doc.text(profile.phone, margin, y + 20);
-      y += 32;
-    }
-
-    // ── Receipt table ─────────────────────────────────────────────────────
-    y += 4;
-    const rows: [string, string][] = [
-      ["Description", "Subscription — AgentVerse AI"],
-      ["Payment ID",  invoice.razorpayPaymentId ?? "—"],
-      ["Order ID",    invoice.razorpayOrderId ?? "—"],
-      ["Date",        date],
-      ["Status",      "PAID"],
-    ];
-
-    // Table header
-    doc.setFillColor(...navy);
-    doc.rect(margin, y, pageW - margin * 2, 9, "F");
-    doc.setTextColor(255, 255, 255);
-    doc.setFont("helvetica", "bold");
-    doc.setFontSize(8.5);
-    doc.text("FIELD", margin + 4, y + 6);
-    doc.text("DETAILS", pageW - margin - 4, y + 6, { align: "right" });
-    y += 9;
-
-    rows.forEach(([label, value], i) => {
-      const rowH = 10;
-      // Zebra
-      if (i % 2 === 0) {
-        doc.setFillColor(...light);
-        doc.rect(margin, y, pageW - margin * 2, rowH, "F");
-      }
-      doc.setTextColor(...grey);
-      doc.setFont("helvetica", "normal");
-      doc.setFontSize(8.5);
-      doc.text(label, margin + 4, y + 6.5);
-
-      // PAID badge in green
-      if (label === "Status") {
-        doc.setTextColor(...green);
-        doc.setFont("helvetica", "bold");
-      } else {
-        doc.setTextColor(...dark);
-        doc.setFont("helvetica", "normal");
-      }
-      doc.text(value, pageW - margin - 4, y + 6.5, { align: "right" });
-      y += rowH;
+      doc.text(val, W - margin - 4, y + 6, { align: "right" });
+      y += 9;
     });
 
-    // ── Total box ─────────────────────────────────────────────────────────
-    y += 6;
+    // Total box
+    y += 2;
     doc.setFillColor(...blue);
-    doc.rect(margin, y, pageW - margin * 2, 14, "F");
+    doc.rect(margin, y, W - margin * 2, 13, "F");
     doc.setTextColor(255, 255, 255);
     doc.setFont("helvetica", "bold");
+    doc.setFontSize(11);
+    doc.text("TOTAL PAID (incl. GST)", margin + 4, y + 9);
     doc.setFontSize(12);
-    doc.text("TOTAL PAID", margin + 4, y + 9.5);
-    doc.setFontSize(13);
-    doc.text(fmtAmount(invoice.amount), pageW - margin - 4, y + 9.5, { align: "right" });
+    doc.text(fmt(totalPaid), W - margin - 4, y + 9, { align: "right" });
 
-    // ── Footer ────────────────────────────────────────────────────────────
+    // Payment ref
+    y += 18;
+    doc.setFontSize(7.5);
+    doc.setFont("helvetica", "normal");
+    doc.setTextColor(...grey);
+    doc.text(`Payment ID: ${invoice.razorpayPaymentId ?? "—"}`, margin, y);
+    doc.text(`Order ID: ${invoice.razorpayOrderId ?? "—"}`, margin, y + 6);
+    doc.setTextColor(...green);
+    doc.setFont("helvetica", "bold");
+    doc.text("STATUS: PAID", W - margin, y, { align: "right" });
+
+    // Footer
     doc.setDrawColor(...light);
     doc.setLineWidth(0.5);
-    doc.line(margin, 272, pageW - margin, 272);
-
+    doc.line(margin, 272, W - margin, 272);
     doc.setTextColor(...grey);
     doc.setFont("helvetica", "normal");
     doc.setFontSize(8);
@@ -175,9 +212,9 @@ function downloadInvoicePDF(invoice: Invoice, profile: UserProfile | null) {
     doc.text("For support: support@agentverse.ai", margin, 285);
     doc.setFont("helvetica", "bold");
     doc.setTextColor(...blue);
-    doc.text("agentverse.ai", pageW - margin, 285, { align: "right" });
+    doc.text("agentverse.ai", W - margin, 285, { align: "right" });
 
-    const filename = `agentverse_receipt_${invoice.razorpayPaymentId ?? invoice.id}.pdf`;
+    const filename = `agentverse_invoice_${invoice.invoiceNumber ?? invoice.razorpayPaymentId ?? invoice.id}.pdf`;
     doc.save(filename);
   });
 }
@@ -186,12 +223,14 @@ export default function InvoicesPage() {
   const { toast } = useToast();
   const [invoices, setInvoices] = useState<Invoice[]>([]);
   const [profile, setProfile] = useState<UserProfile | null>(null);
+  const [billing, setBilling] = useState<BillingProfile | null>(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     Promise.all([
       getInvoices().then((r) => setInvoices(r.data)),
       getProfile().then((r) => setProfile(r.data)).catch(() => {}),
+      getBillingProfile().then((r) => setBilling(r.data)).catch(() => {}),
     ])
       .catch(() => toast("Could not load invoices", "error"))
       .finally(() => setLoading(false));
@@ -242,7 +281,7 @@ export default function InvoicesPage() {
                 <div className="flex items-center gap-2 shrink-0">
                   <span className="border border-emerald-400/30 bg-emerald-400/10 px-2 py-0.5 text-[10px] text-emerald-300">PAID</span>
                   <button
-                    onClick={() => downloadInvoicePDF(inv, profile)}
+                    onClick={() => downloadInvoicePDF(inv, profile, billing)}
                     className="border border-white/15 px-3 py-1.5 text-xs text-white/60 hover:border-sky-200/30 hover:text-sky-200 transition"
                   >
                     PDF ↓

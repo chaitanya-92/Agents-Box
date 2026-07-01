@@ -20,8 +20,8 @@ export const pricingPlans: PricingPlan[] = [
   {
     id: "pro",
     name: "Pro",
-    monthlyPrice: 2499,
-    yearlyPrice: 24999,
+    monthlyPrice: 4999,
+    yearlyPrice: 49999,
     description: "For power users that need the full agent catalog and workflow speed.",
     features: ["All agents", "75K monthly credits", "Priority processing", "Razorpay billing", "Google OAuth"],
     highlighted: true
@@ -29,8 +29,8 @@ export const pricingPlans: PricingPlan[] = [
   {
     id: "scale",
     name: "Scale",
-    monthlyPrice: 6999,
-    yearlyPrice: 69999,
+    monthlyPrice: 9999,
+    yearlyPrice: 99999,
     description: "For teams running AI workflows in production with governance controls.",
     features: ["Unlimited seats", "250K monthly credits", "Agent API Hub", "Usage governance", "Webhook events"]
   }

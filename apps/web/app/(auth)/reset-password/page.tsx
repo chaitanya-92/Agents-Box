@@ -4,6 +4,7 @@ import Link from "next/link";
 import { Suspense, useState } from "react";
 import { useSearchParams, useRouter } from "next/navigation";
 import { resetPassword } from "@/lib/api";
+import { KeyRound, CheckCircle2 } from "lucide-react";
 
 function ResetPasswordForm() {
   const params = useSearchParams();
@@ -38,7 +39,7 @@ function ResetPasswordForm() {
   if (done) {
     return (
       <div className="text-center">
-        <div className="text-3xl mb-4">🔐</div>
+        <CheckCircle2 size={48} className="mx-auto mb-4 text-emerald-400" strokeWidth={1.5} />
         <h1 className="font-[var(--font-pixel)] text-xl text-white mb-3">Password updated!</h1>
         <p className="text-sm text-white/55">Redirecting you to login…</p>
       </div>
@@ -48,7 +49,10 @@ function ResetPasswordForm() {
   return (
     <>
       <p className="section-label">Account</p>
-      <h1 className="mt-4 font-[var(--font-pixel)] text-2xl text-white">Set new password</h1>
+      <div className="mt-4 flex items-center gap-3">
+        <KeyRound size={22} className="text-sky-200/70" strokeWidth={1.5} />
+        <h1 className="font-[var(--font-pixel)] text-2xl text-white">Set new password</h1>
+      </div>
       <p className="mt-3 text-sm text-white/55">Choose a strong password for your account.</p>
 
       {!token ? (

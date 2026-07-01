@@ -7,34 +7,22 @@ import { clearAuthSession, getCurrentUser, type AuthUser } from "@/lib/auth";
 import { resendVerification } from "@/lib/api";
 import { useToast } from "@/components/ui/toast";
 import { Modal } from "@/components/ui/modal";
+import {
+  LayoutDashboard, Bot, MessageSquare, Layers, FileText,
+  Key, User, Settings2, LogOut, ChevronLeft, ChevronRight,
+  Menu, X, AlertTriangle, type LucideIcon,
+} from "lucide-react";
 
-const NAV = [
-  { href: "/dashboard",     label: "Dashboard",     icon: "⬡" },
-  { href: "/agents",        label: "Agents",        icon: "◈" },
-  { href: "/conversations", label: "History",       icon: "◫" },
-  { href: "/plans",         label: "Plans",         icon: "◇" },
-  { href: "/invoices",      label: "Invoices",      icon: "◻" },
-  { href: "/api-keys",      label: "API Keys",      icon: "⌘" },
-  { href: "/profile",       label: "Profile",       icon: "◉" },
+const NAV: { href: string; label: string; Icon: LucideIcon }[] = [
+  { href: "/dashboard",     label: "Dashboard", Icon: LayoutDashboard },
+  { href: "/agents",        label: "Agents",    Icon: Bot              },
+  { href: "/conversations", label: "History",   Icon: MessageSquare   },
+  { href: "/plans",         label: "Plans",     Icon: Layers           },
+  { href: "/invoices",      label: "Invoices",  Icon: FileText         },
+  { href: "/api-keys",      label: "API Keys",  Icon: Key              },
+  { href: "/profile",       label: "Profile",   Icon: User             },
 ];
 
-function MenuIcon({ open }: { open: boolean }) {
-  return (
-    <div className="flex flex-col justify-center gap-[5px] w-5 h-5">
-      <span className={`block h-px bg-white/70 transition-all duration-200 ${open ? "translate-y-[6px] rotate-45" : ""}`} />
-      <span className={`block h-px bg-white/70 transition-all duration-200 ${open ? "opacity-0" : ""}`} />
-      <span className={`block h-px bg-white/70 transition-all duration-200 ${open ? "-translate-y-[6px] -rotate-45" : ""}`} />
-    </div>
-  );
-}
-
-function CollapseIcon({ collapsed }: { collapsed: boolean }) {
-  return (
-    <svg width="14" height="14" viewBox="0 0 14 14" fill="none" className="transition-transform duration-200" style={{ transform: collapsed ? "rotate(180deg)" : "none" }}>
-      <path d="M9 2L4 7L9 12" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
-    </svg>
-  );
-}
 
 const COLLAPSED_KEY = "av_sidebar_collapsed";
 
@@ -119,7 +107,9 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
               className="text-white/30 hover:text-white transition p-1 ml-auto"
               title={collapsed ? "Expand sidebar" : "Collapse sidebar"}
             >
-              <CollapseIcon collapsed={collapsed} />
+              {collapsed
+                ? <ChevronRight size={14} />
+                : <ChevronLeft size={14} />}
             </button>
           )}
         </div>
@@ -128,7 +118,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
         <nav className="flex-1 space-y-1 p-2 mt-2 overflow-y-auto">
           {[
             ...NAV,
-            ...(user?.role === "ADMIN" ? [{ href: "/admin", label: "Admin", icon: "⚙" }] : []),
+            ...(user?.role === "ADMIN" ? [{ href: "/admin", label: "Admin", Icon: Settings2 as LucideIcon }] : []),
           ].map((item) => {
             const active = pathname === item.href || pathname.startsWith(item.href + "/");
             return (
@@ -144,7 +134,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
                     : "text-white/60 hover:bg-white/[0.04] hover:text-white/90"
                 }`}
               >
-                <span className="text-xs shrink-0">{item.icon}</span>
+                <item.Icon size={15} className="shrink-0" />
                 {(!collapsed || isMobile) && <span>{item.label}</span>}
               </Link>
             );
@@ -162,11 +152,12 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
           <button
             onClick={() => setShowLogoutModal(true)}
             title="Sign out"
-            className={`border border-white/10 text-xs text-white/55 transition hover:border-rose-400/30 hover:text-rose-300 ${
-              collapsed && !isMobile ? "w-9 h-9 flex items-center justify-center" : "w-full px-3 py-2"
+            className={`border border-white/10 text-xs text-white/55 transition hover:border-rose-400/30 hover:text-rose-300 flex items-center justify-center gap-2 ${
+              collapsed && !isMobile ? "w-9 h-9" : "w-full px-3 py-2"
             }`}
           >
-            {collapsed && !isMobile ? "↩" : "Sign out"}
+            <LogOut size={13} />
+            {(!collapsed || isMobile) && "Sign out"}
           </button>
         </div>
       </>
@@ -216,7 +207,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
             className="p-1 text-white/60 hover:text-white transition"
             aria-label="Toggle menu"
           >
-            <MenuIcon open={mobileOpen} />
+            {mobileOpen ? <X size={18} /> : <Menu size={18} />}
           </button>
           <Link href="/dashboard" className="font-[var(--font-pixel)] text-sm text-sky-200 tracking-wider">
             AGENTVERSE
@@ -229,7 +220,10 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
         {/* Email verify banner */}
         {emailVerified === false && (
           <div className="flex items-center justify-between gap-3 border-b border-amber-400/20 bg-amber-400/[0.06] px-4 py-2 text-xs">
-            <span className="text-amber-200">Please verify your email to unlock all features.</span>
+            <span className="flex items-center gap-2 text-amber-200">
+              <AlertTriangle size={13} className="shrink-0" />
+              Please verify your email to unlock all features.
+            </span>
             <button
               onClick={handleResendVerify}
               disabled={resendingVerify}

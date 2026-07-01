@@ -6,6 +6,7 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { loginUser, registerUser, verifyOtp, resendOtp, ApiError, type AuthResponse } from "@/lib/api";
 import { storeAuthSession } from "@/lib/auth";
 import { publicEnv } from "@/lib/env";
+import { Mail, RefreshCw, ArrowLeft, ShieldCheck } from "lucide-react";
 
 type AuthVariant = "login" | "register";
 
@@ -124,7 +125,9 @@ function OtpStep({
     <div className="mt-8 space-y-5">
       {/* Info banner */}
       <div className={`rounded border ${borderColour} px-5 py-4 text-center`}>
-        <p className="text-2xl mb-2">📬</p>
+        <div className="flex justify-center mb-3">
+          <Mail size={28} className={textColour} strokeWidth={1.5} />
+        </div>
         <p className={`text-sm font-medium ${textColour} mb-1`}>
           {context === "register" ? "Check your email" : "Verify your email to continue"}
         </p>
@@ -173,9 +176,10 @@ function OtpStep({
           <button
             onClick={handleResend}
             disabled={resending}
-            className="text-xs text-sky-200 hover:text-sky-100 transition disabled:opacity-50"
+            className="inline-flex items-center gap-1.5 text-xs text-sky-200 hover:text-sky-100 transition disabled:opacity-50"
           >
-            {resending ? "Sending…" : "Resend code →"}
+            <RefreshCw size={11} className={resending ? "animate-spin" : ""} />
+            {resending ? "Sending…" : "Resend code"}
           </button>
         )}
       </div>
@@ -183,9 +187,10 @@ function OtpStep({
       {/* Back */}
       <button
         onClick={onBack}
-        className="w-full text-xs text-white/30 hover:text-white/60 transition"
+        className="w-full inline-flex items-center justify-center gap-1.5 text-xs text-white/30 hover:text-white/60 transition"
       >
-        ← {context === "register" ? "Back to registration" : "Back to login"}
+        <ArrowLeft size={11} />
+        {context === "register" ? "Back to registration" : "Back to login"}
       </button>
     </div>
   );

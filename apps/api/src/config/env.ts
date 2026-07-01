@@ -33,11 +33,9 @@ const envSchema = z.object({
   APP_URL:                   z.string().default("http://localhost:3000"),
   API_URL:                   z.string().default("http://localhost:8080"),
   CORS_ORIGIN:               z.string().default("*"),
-  // Email (optional — skip if not configured)
-  SMTP_HOST:                 z.string().optional(),
-  SMTP_PORT:                 z.coerce.number().default(587),
-  SMTP_USER:                 z.string().optional(),
-  SMTP_PASS:                 z.string().optional(),
+  // Email via Resend (https://resend.com — add RESEND_API_KEY to Render env vars)
+  RESEND_API_KEY:            z.string().optional(),
+  EMAIL_FROM:                z.string().default("AgentVerse AI <noreply@agentverse.ai>"),
 });
 
 export const env = envSchema.parse(process.env);

@@ -1,37 +1,37 @@
-import nodemailer from "nodemailer";
+import { Resend } from "resend";
 import { env } from "@/config/env";
 
-let transporter: nodemailer.Transporter | null = null;
-
-function getTransporter() {
-  if (!env.SMTP_HOST || !env.SMTP_USER || !env.SMTP_PASS) return null;
-  if (transporter) return transporter;
-  transporter = nodemailer.createTransport({
-    host: env.SMTP_HOST,
-    port: env.SMTP_PORT,
-    secure: env.SMTP_PORT === 465,
-    auth: { user: env.SMTP_USER, pass: env.SMTP_PASS },
-  });
-  return transporter;
+// Lazy-init so we don't crash at startup if the key is missing
+let _resend: Resend | null = null;
+function getResend(): Resend | null {
+  if (!env.RESEND_API_KEY) return null;
+  if (!_resend) _resend = new Resend(env.RESEND_API_KEY);
+  return _resend;
 }
+
+// ─── Core send function ───────────────────────────────────────────────────────
 
 export async function sendMail(opts: {
   to: string;
   subject: string;
   html: string;
 }): Promise<boolean> {
-  const t = getTransporter();
-  if (!t) {
-    console.log("[mailer] SMTP not configured — skipping email to", opts.to);
+  const client = getResend();
+  if (!client) {
+    console.log("[mailer] RESEND_API_KEY not set — skipping email to", opts.to);
     return false;
   }
   try {
-    await t.sendMail({
-      from: `"AgentVerse AI" <${env.SMTP_USER}>`,
-      to: opts.to,
+    const { error } = await client.emails.send({
+      from: env.EMAIL_FROM,
+      to:   opts.to,
       subject: opts.subject,
       html: opts.html,
     });
+    if (error) {
+      console.error("[mailer] ❌ Resend error:", error);
+      return false;
+    }
     console.log("[mailer] ✅ Email sent to", opts.to);
     return true;
   } catch (err) {
@@ -40,113 +40,126 @@ export async function sendMail(opts: {
   }
 }
 
+// ─── Email templates ──────────────────────────────────────────────────────────
+
+const BASE_STYLE = `
+  body { margin:0;padding:0;background:#0a0f1a;font-family:'Segoe UI',Arial,sans-serif;color:#e2e8f0; }
+  table { border-collapse:collapse; }
+  a { text-decoration:none; }
+`;
+
+function emailShell(body: string): string {
+  return `<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8"/>
+  <meta name="viewport" content="width=device-width,initial-scale=1"/>
+  <meta name="x-apple-disable-message-reformatting"/>
+  <title>AgentVerse AI</title>
+  <style>${BASE_STYLE}</style>
+</head>
+<body>
+  <table width="100%" cellpadding="0" cellspacing="0" role="presentation" style="background:#0a0f1a;padding:40px 16px;">
+    <tr><td align="center">
+      <table width="520" cellpadding="0" cellspacing="0" role="presentation"
+        style="max-width:520px;width:100%;background:#0d1424;border:1px solid rgba(186,230,255,0.12);">
+
+        <!-- Header -->
+        <tr>
+          <td style="padding:24px 32px;border-bottom:1px solid rgba(255,255,255,0.08);">
+            <p style="margin:0;font-size:13px;font-weight:700;color:#bae6ff;letter-spacing:4px;text-transform:uppercase;">
+              AGENTVERSE AI
+            </p>
+          </td>
+        </tr>
+
+        <!-- Body -->
+        <tr><td style="padding:32px;">${body}</td></tr>
+
+        <!-- Footer -->
+        <tr>
+          <td style="padding:20px 32px;border-top:1px solid rgba(255,255,255,0.06);">
+            <p style="margin:0;font-size:11px;color:rgba(255,255,255,0.3);line-height:1.6;">
+              AgentVerse AI &mdash; One Platform. Unlimited AI Agents.<br/>
+              If you didn't request this email, you can safely ignore it.
+            </p>
+          </td>
+        </tr>
+
+      </table>
+    </td></tr>
+  </table>
+</body>
+</html>`;
+}
+
+// ─── OTP ─────────────────────────────────────────────────────────────────────
+
 export function buildOtpEmail(opts: { name: string; otp: string }): string {
-  const digits = opts.otp.split("").map(d =>
-    `<td style="padding:0 4px;">
-       <div style="width:40px;height:52px;background:rgba(186,230,255,0.08);border:1px solid rgba(186,230,255,0.25);border-radius:4px;display:inline-flex;align-items:center;justify-content:center;">
-         <span style="font-size:28px;font-weight:700;color:#bae6ff;font-family:monospace;">${d}</span>
-       </div>
-     </td>`
-  ).join("");
+  const firstName = opts.name.split(" ")[0];
 
-  return `<!DOCTYPE html>
-<html>
-<head><meta charset="utf-8"/><title>Your verification code</title></head>
-<body style="margin:0;padding:0;background:#0a0f1a;font-family:'Segoe UI',Arial,sans-serif;color:#e2e8f0;">
-  <table width="100%" cellpadding="0" cellspacing="0" style="background:#0a0f1a;padding:40px 0;">
-    <tr><td align="center">
-      <table width="480" cellpadding="0" cellspacing="0" style="max-width:480px;width:100%;background:#0d1424;border:1px solid rgba(186,230,255,0.12);">
-        <tr><td style="padding:28px 36px;border-bottom:1px solid rgba(255,255,255,0.08);">
-          <p style="margin:0;font-size:16px;font-weight:700;color:#bae6ff;letter-spacing:3px;text-transform:uppercase;">AGENTVERSE AI</p>
-        </td></tr>
-        <tr><td style="padding:36px;text-align:center;">
-          <p style="margin:0 0 6px;font-size:22px;font-weight:700;color:#fff;">Verify your email</p>
-          <p style="margin:0 0 28px;font-size:14px;color:rgba(255,255,255,0.55);line-height:1.6;">
-            Hi ${opts.name.split(" ")[0]}, enter this code to activate your account:
-          </p>
-          <table cellpadding="0" cellspacing="0" style="margin:0 auto 28px;">
-            <tr>${digits}</tr>
-          </table>
-          <p style="margin:0 0 8px;font-size:13px;color:rgba(255,255,255,0.35);">
-            This code expires in <strong style="color:rgba(255,255,255,0.55);">10 minutes</strong>.
-          </p>
-          <p style="margin:0;font-size:12px;color:rgba(255,255,255,0.25);">
-            If you didn't create an account with AgentVerse AI, you can safely ignore this email.
-          </p>
-        </td></tr>
-        <tr><td style="padding:20px 36px;border-top:1px solid rgba(255,255,255,0.06);">
-          <p style="margin:0;font-size:11px;color:rgba(255,255,255,0.3);">AgentVerse AI — One Platform. Unlimited AI Agents.</p>
-        </td></tr>
-      </table>
-    </td></tr>
-  </table>
-</body>
-</html>`;
+  // Render each digit as an individual box
+  const digitBoxes = opts.otp.split("").map(d => `
+    <td style="padding:0 4px;">
+      <div style="
+        display:inline-block;
+        width:44px;height:56px;line-height:56px;
+        background:rgba(186,230,255,0.08);
+        border:1px solid rgba(186,230,255,0.30);
+        border-radius:6px;
+        text-align:center;
+        font-size:30px;font-weight:700;
+        font-family:'Courier New',monospace;
+        color:#bae6ff;
+      ">${d}</div>
+    </td>`).join("");
+
+  const body = `
+    <p style="margin:0 0 6px;font-size:21px;font-weight:700;color:#fff;">
+      Your verification code
+    </p>
+    <p style="margin:0 0 28px;font-size:14px;color:rgba(255,255,255,0.55);line-height:1.6;">
+      Hi ${firstName}, enter the code below to verify your email and activate your AgentVerse AI account.
+    </p>
+
+    <table cellpadding="0" cellspacing="0" role="presentation" style="margin:0 auto 28px;">
+      <tr>${digitBoxes}</tr>
+    </table>
+
+    <p style="margin:0 0 6px;font-size:13px;color:rgba(255,255,255,0.40);text-align:center;">
+      This code expires in <strong style="color:rgba(255,255,255,0.60);">10 minutes</strong>.
+    </p>
+    <p style="margin:0;font-size:12px;color:rgba(255,255,255,0.25);text-align:center;">
+      Do not share this code with anyone.
+    </p>
+  `;
+  return emailShell(body);
 }
 
-export function buildVerificationEmail(opts: { name: string; verifyUrl: string }): string {
-  return `<!DOCTYPE html>
-<html>
-<head><meta charset="utf-8"/><title>Verify your email</title></head>
-<body style="margin:0;padding:0;background:#0a0f1a;font-family:'Segoe UI',Arial,sans-serif;color:#e2e8f0;">
-  <table width="100%" cellpadding="0" cellspacing="0" style="background:#0a0f1a;padding:40px 0;">
-    <tr><td align="center">
-      <table width="560" cellpadding="0" cellspacing="0" style="max-width:560px;width:100%;background:#0d1424;border:1px solid rgba(186,230,255,0.12);">
-        <tr><td style="padding:28px 36px;border-bottom:1px solid rgba(255,255,255,0.08);">
-          <p style="margin:0;font-size:16px;font-weight:700;color:#bae6ff;letter-spacing:3px;text-transform:uppercase;">AGENTVERSE AI</p>
-        </td></tr>
-        <tr><td style="padding:36px;">
-          <p style="margin:0 0 6px;font-size:22px;font-weight:700;color:#fff;">Verify your email</p>
-          <p style="margin:0 0 24px;font-size:14px;color:rgba(255,255,255,0.55);line-height:1.6;">
-            Hi ${opts.name.split(" ")[0]}, click the button below to verify your email address and activate your account.
-            This link expires in 24 hours.
-          </p>
-          <a href="${opts.verifyUrl}" style="display:inline-block;background:rgba(186,230,255,0.1);border:1px solid rgba(186,230,255,0.3);color:#bae6ff;text-decoration:none;padding:12px 28px;font-size:13px;letter-spacing:1px;">
-            Verify Email →
-          </a>
-          <p style="margin:24px 0 0;font-size:12px;color:rgba(255,255,255,0.3);">
-            Or copy this link: ${opts.verifyUrl}
-          </p>
-        </td></tr>
-        <tr><td style="padding:20px 36px;border-top:1px solid rgba(255,255,255,0.06);">
-          <p style="margin:0;font-size:11px;color:rgba(255,255,255,0.3);">If you didn't create an account, you can ignore this email.</p>
-        </td></tr>
-      </table>
-    </td></tr>
-  </table>
-</body>
-</html>`;
-}
+// ─── Password reset ───────────────────────────────────────────────────────────
 
 export function buildPasswordResetEmail(opts: { name: string; resetUrl: string }): string {
-  return `<!DOCTYPE html>
-<html>
-<head><meta charset="utf-8"/><title>Reset your password</title></head>
-<body style="margin:0;padding:0;background:#0a0f1a;font-family:'Segoe UI',Arial,sans-serif;color:#e2e8f0;">
-  <table width="100%" cellpadding="0" cellspacing="0" style="background:#0a0f1a;padding:40px 0;">
-    <tr><td align="center">
-      <table width="560" cellpadding="0" cellspacing="0" style="max-width:560px;width:100%;background:#0d1424;border:1px solid rgba(186,230,255,0.12);">
-        <tr><td style="padding:28px 36px;border-bottom:1px solid rgba(255,255,255,0.08);">
-          <p style="margin:0;font-size:16px;font-weight:700;color:#bae6ff;letter-spacing:3px;text-transform:uppercase;">AGENTVERSE AI</p>
-        </td></tr>
-        <tr><td style="padding:36px;">
-          <p style="margin:0 0 6px;font-size:22px;font-weight:700;color:#fff;">Reset your password</p>
-          <p style="margin:0 0 24px;font-size:14px;color:rgba(255,255,255,0.55);line-height:1.6;">
-            Hi ${opts.name.split(" ")[0]}, click below to set a new password. This link expires in 2 hours.
-          </p>
-          <a href="${opts.resetUrl}" style="display:inline-block;background:rgba(186,230,255,0.1);border:1px solid rgba(186,230,255,0.3);color:#bae6ff;text-decoration:none;padding:12px 28px;font-size:13px;letter-spacing:1px;">
-            Reset Password →
-          </a>
-          <p style="margin:24px 0 0;font-size:12px;color:rgba(255,255,255,0.3);">
-            If you didn't request this, you can safely ignore this email.
-          </p>
-        </td></tr>
-      </table>
-    </td></tr>
-  </table>
-</body>
-</html>`;
+  const firstName = opts.name.split(" ")[0];
+  const body = `
+    <p style="margin:0 0 6px;font-size:21px;font-weight:700;color:#fff;">Reset your password</p>
+    <p style="margin:0 0 24px;font-size:14px;color:rgba(255,255,255,0.55);line-height:1.6;">
+      Hi ${firstName}, click the button below to set a new password.
+      This link expires in <strong style="color:rgba(255,255,255,0.70);">2 hours</strong>.
+    </p>
+    <a href="${opts.resetUrl}"
+      style="display:inline-block;background:rgba(186,230,255,0.10);border:1px solid rgba(186,230,255,0.30);
+             color:#bae6ff;padding:12px 28px;font-size:13px;letter-spacing:1px;border-radius:2px;">
+      Reset Password &rarr;
+    </a>
+    <p style="margin:24px 0 0;font-size:12px;color:rgba(255,255,255,0.25);">
+      Or copy this link into your browser:<br/>
+      <span style="color:rgba(186,230,255,0.40);word-break:break-all;">${opts.resetUrl}</span>
+    </p>
+  `;
+  return emailShell(body);
 }
+
+// ─── Payment receipt ──────────────────────────────────────────────────────────
 
 export function buildWelcomeEmail(opts: {
   name: string;
@@ -156,83 +169,54 @@ export function buildWelcomeEmail(opts: {
   orderId: string;
   date: string;
 }): string {
-  return `<!DOCTYPE html>
-<html>
-<head>
-  <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>Welcome to AgentVerse AI</title>
-</head>
-<body style="margin:0;padding:0;background:#0a0f1a;font-family:'Segoe UI',Arial,sans-serif;color:#e2e8f0;">
-  <table width="100%" cellpadding="0" cellspacing="0" style="background:#0a0f1a;padding:40px 0;">
-    <tr><td align="center">
-      <table width="600" cellpadding="0" cellspacing="0" style="max-width:600px;width:100%;background:#0d1424;border:1px solid rgba(186,230,255,0.12);border-radius:2px;">
+  const firstName = opts.name.split(" ")[0];
+  const rows = [
+    ["Date",       opts.date],
+    ["Amount Paid", `Rs. ${opts.amount.toLocaleString("en-IN")}`],
+    ["Payment ID",  opts.paymentId],
+    ["Order ID",    opts.orderId],
+  ].map(([label, value], i) => `
+    <tr style="background:${i % 2 === 0 ? "rgba(255,255,255,0.02)" : "transparent"};">
+      <td style="padding:11px 14px;font-size:13px;color:rgba(255,255,255,0.50);">${label}</td>
+      <td style="padding:11px 14px;font-size:13px;color:#e2e8f0;text-align:right;font-family:monospace;">${value}</td>
+    </tr>`).join("");
 
-        <!-- Header -->
-        <tr>
-          <td style="padding:32px 40px;border-bottom:1px solid rgba(255,255,255,0.08);">
-            <p style="margin:0;font-size:18px;font-weight:700;color:#bae6ff;letter-spacing:3px;text-transform:uppercase;">AGENTVERSE AI</p>
-            <p style="margin:6px 0 0;font-size:12px;color:rgba(255,255,255,0.4);letter-spacing:1px;">One Platform. Unlimited AI Agents.</p>
-          </td>
-        </tr>
+  const body = `
+    <p style="margin:0 0 8px;font-size:22px;font-weight:700;color:#fff;">
+      Welcome aboard, ${firstName}!
+    </p>
+    <p style="margin:0 0 24px;font-size:14px;color:rgba(255,255,255,0.55);line-height:1.6;">
+      Your <strong style="color:#bae6ff;">${opts.planName}</strong> subscription is now active.
+      You have full access to your AI agent catalog.
+    </p>
 
-        <!-- Body -->
-        <tr>
-          <td style="padding:40px;">
-            <p style="margin:0 0 8px;font-size:24px;font-weight:700;color:#fff;">
-              🎉 Welcome aboard, ${opts.name.split(" ")[0]}!
-            </p>
-            <p style="margin:0 0 24px;font-size:15px;color:rgba(255,255,255,0.6);line-height:1.6;">
-              Thank you for subscribing to <strong style="color:#bae6ff;">${opts.planName}</strong> on AgentVerse AI.
-              Your subscription is now active and you have full access to your agent catalog.
-            </p>
+    <!-- Plan badge -->
+    <div style="background:rgba(186,230,255,0.06);border:1px solid rgba(186,230,255,0.15);
+                padding:18px 22px;margin-bottom:24px;border-radius:2px;">
+      <p style="margin:0 0 3px;font-size:10px;color:rgba(255,255,255,0.35);
+                text-transform:uppercase;letter-spacing:2px;">Active Plan</p>
+      <p style="margin:0;font-size:20px;font-weight:700;color:#bae6ff;">${opts.planName}</p>
+    </div>
 
-            <!-- Plan badge -->
-            <div style="background:rgba(186,230,255,0.06);border:1px solid rgba(186,230,255,0.15);padding:20px 24px;margin-bottom:28px;border-radius:2px;">
-              <p style="margin:0 0 4px;font-size:11px;color:rgba(255,255,255,0.4);text-transform:uppercase;letter-spacing:2px;">Active Plan</p>
-              <p style="margin:0;font-size:22px;font-weight:700;color:#bae6ff;">${opts.planName}</p>
-            </div>
+    <!-- Receipt -->
+    <p style="margin:0 0 10px;font-size:11px;color:rgba(255,255,255,0.35);
+              text-transform:uppercase;letter-spacing:2px;">Payment Receipt</p>
+    <table width="100%" cellpadding="0" cellspacing="0" role="presentation"
+      style="border:1px solid rgba(255,255,255,0.08);margin-bottom:24px;">
+      ${rows}
+    </table>
 
-            <!-- Receipt table -->
-            <p style="margin:0 0 12px;font-size:12px;color:rgba(255,255,255,0.4);text-transform:uppercase;letter-spacing:2px;">Payment Receipt</p>
-            <table width="100%" cellpadding="0" cellspacing="0" style="border:1px solid rgba(255,255,255,0.08);border-radius:2px;overflow:hidden;">
-              ${[
-                ["Date", opts.date],
-                ["Amount Paid", `₹${opts.amount.toLocaleString("en-IN")}`],
-                ["Payment ID", opts.paymentId],
-                ["Order ID", opts.orderId],
-              ].map(([label, value], i) => `
-              <tr style="background:${i % 2 === 0 ? "rgba(255,255,255,0.02)" : "transparent"};">
-                <td style="padding:12px 16px;font-size:13px;color:rgba(255,255,255,0.5);">${label}</td>
-                <td style="padding:12px 16px;font-size:13px;color:#e2e8f0;text-align:right;font-family:monospace;">${value}</td>
-              </tr>`).join("")}
-            </table>
+    <a href="${env.APP_URL}/dashboard"
+      style="display:inline-block;background:rgba(186,230,255,0.10);border:1px solid rgba(186,230,255,0.30);
+             color:#bae6ff;padding:12px 28px;font-size:13px;letter-spacing:1px;border-radius:2px;">
+      Go to Dashboard &rarr;
+    </a>
+  `;
+  return emailShell(body);
+}
 
-            <p style="margin:28px 0 24px;font-size:14px;color:rgba(255,255,255,0.55);line-height:1.7;">
-              You can now access all your AI agents from the dashboard. If you have any questions or need help getting started,
-              just reply to this email — we're here to help.
-            </p>
+// ─── Legacy — kept for backward compat ───────────────────────────────────────
 
-            <!-- CTA -->
-            <a href="${env.APP_URL}/dashboard" style="display:inline-block;background:rgba(186,230,255,0.1);border:1px solid rgba(186,230,255,0.3);color:#bae6ff;text-decoration:none;padding:12px 28px;font-size:13px;letter-spacing:1px;">
-              Go to Dashboard →
-            </a>
-          </td>
-        </tr>
-
-        <!-- Footer -->
-        <tr>
-          <td style="padding:24px 40px;border-top:1px solid rgba(255,255,255,0.06);">
-            <p style="margin:0;font-size:11px;color:rgba(255,255,255,0.3);line-height:1.6;">
-              AgentVerse AI · ${env.APP_URL}<br/>
-              This is an automated receipt. Please keep it for your records.
-            </p>
-          </td>
-        </tr>
-
-      </table>
-    </td></tr>
-  </table>
-</body>
-</html>`;
+export function buildVerificationEmail(opts: { name: string; verifyUrl: string }): string {
+  return buildPasswordResetEmail({ name: opts.name, resetUrl: opts.verifyUrl });
 }

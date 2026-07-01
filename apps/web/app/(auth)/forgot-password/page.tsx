@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useState } from "react";
 import { forgotPassword } from "@/lib/api";
+import { Mail, ArrowLeft } from "lucide-react";
 
 export default function ForgotPasswordPage() {
   const [email, setEmail] = useState("");
@@ -33,13 +34,13 @@ export default function ForgotPasswordPage() {
 
         {sent ? (
           <div className="mt-8 text-center">
-            <div className="mx-auto mb-4 text-3xl">📬</div>
+            <Mail size={44} className="mx-auto mb-4 text-sky-200/70" strokeWidth={1.5} />
             <p className="text-sm text-white/60 leading-6">
               If an account with <strong className="text-white">{email}</strong> exists, we've sent a password reset link.
               Check your inbox (and spam folder).
             </p>
-            <Link href="/login" className="mt-6 inline-block text-sm text-sky-200 hover:text-sky-100 transition">
-              ← Back to login
+            <Link href="/login" className="mt-6 inline-flex items-center gap-1.5 text-sm text-sky-200 hover:text-sky-100 transition">
+              <ArrowLeft size={13} /> Back to login
             </Link>
           </div>
         ) : (
@@ -67,7 +68,7 @@ export default function ForgotPasswordPage() {
                 {loading ? "Sending…" : "Send reset link"}
               </button>
               <p className="text-sm text-white/45 text-center">
-                <Link href="/login" className="text-sky-200 hover:text-sky-100 transition">← Back to login</Link>
+                <Link href="/login" className="inline-flex items-center gap-1.5 text-sky-200 hover:text-sky-100 transition"><ArrowLeft size={13} /> Back to login</Link>
               </p>
             </form>
           </>

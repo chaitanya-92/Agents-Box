@@ -4,6 +4,7 @@ import Link from "next/link";
 import { Suspense, useEffect, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import { verifyEmail } from "@/lib/api";
+import { CheckCircle2, XCircle, Loader2, Mail } from "lucide-react";
 
 type Status = "loading" | "success" | "error" | "missing";
 
@@ -26,7 +27,7 @@ function VerifyEmailContent() {
   if (status === "loading") {
     return (
       <>
-        <div className="mx-auto mb-6 h-10 w-10 border-2 border-sky-200/20 border-t-sky-200 rounded-full animate-spin" />
+        <Loader2 size={36} className="mx-auto mb-5 text-sky-200/60 animate-spin" />
         <p className="text-sm text-white/60">Verifying your email…</p>
       </>
     );
@@ -35,7 +36,7 @@ function VerifyEmailContent() {
   if (status === "success") {
     return (
       <>
-        <div className="mx-auto mb-5 flex h-14 w-14 items-center justify-center text-3xl">✅</div>
+        <CheckCircle2 size={48} className="mx-auto mb-5 text-emerald-400" strokeWidth={1.5} />
         <h1 className="font-[var(--font-pixel)] text-xl text-white mb-3">Email verified!</h1>
         <p className="text-sm text-white/55 mb-6">Your account is now fully activated. You're ready to go.</p>
         <Link
@@ -51,7 +52,7 @@ function VerifyEmailContent() {
   if (status === "error") {
     return (
       <>
-        <div className="mx-auto mb-5 flex h-14 w-14 items-center justify-center text-3xl">❌</div>
+        <XCircle size={48} className="mx-auto mb-5 text-rose-400" strokeWidth={1.5} />
         <h1 className="font-[var(--font-pixel)] text-xl text-white mb-3">Verification failed</h1>
         <p className="text-sm text-white/55 mb-6">{message || "This link may be invalid or expired."}</p>
         <Link href="/dashboard" className="text-sm text-sky-200 hover:text-sky-100 transition underline">
@@ -64,6 +65,7 @@ function VerifyEmailContent() {
   // missing token
   return (
     <>
+      <Mail size={40} className="mx-auto mb-5 text-sky-200/60" strokeWidth={1.5} />
       <h1 className="font-[var(--font-pixel)] text-xl text-white mb-3">Check your email</h1>
       <p className="text-sm text-white/55">
         We've sent a verification link to your email address. Click it to activate your account.

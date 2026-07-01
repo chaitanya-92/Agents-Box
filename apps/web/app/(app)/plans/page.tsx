@@ -12,6 +12,17 @@ declare global {
   }
 }
 
+type Receipt = {
+  planName: string;
+  amount: number;
+  currency: string;
+  orderId: string;
+  paymentId: string;
+  date: string;
+  userName: string;
+  userEmail: string;
+};
+
 async function loadRazorpay(): Promise<boolean> {
   if (window.Razorpay) return true;
   return new Promise((resolve) => {
@@ -21,6 +32,120 @@ async function loadRazorpay(): Promise<boolean> {
     s.onerror = () => resolve(false);
     document.body.appendChild(s);
   });
+}
+
+function ReceiptModal({ receipt, onClose }: { receipt: Receipt; onClose: () => void }) {
+  function downloadReceipt() {
+    const html = `<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8" />
+  <title>AgentVerse Payment Receipt</title>
+  <style>
+    body { font-family: 'Segoe UI', Arial, sans-serif; max-width: 600px; margin: 40px auto; color: #111; }
+    .header { border-bottom: 2px solid #0ea5e9; padding-bottom: 16px; margin-bottom: 24px; }
+    .logo { font-size: 22px; font-weight: 700; color: #0ea5e9; letter-spacing: 1px; }
+    .title { font-size: 14px; color: #555; margin-top: 4px; }
+    .badge { display: inline-block; background: #dcfce7; color: #16a34a; padding: 4px 12px; border-radius: 20px; font-size: 13px; font-weight: 600; margin-bottom: 20px; }
+    table { width: 100%; border-collapse: collapse; }
+    td { padding: 10px 0; border-bottom: 1px solid #eee; font-size: 14px; }
+    td:first-child { color: #666; }
+    td:last-child { text-align: right; font-weight: 500; }
+    .amount-row td { font-size: 18px; font-weight: 700; border-bottom: none; padding-top: 16px; }
+    .footer { margin-top: 32px; font-size: 12px; color: #999; text-align: center; }
+  </style>
+</head>
+<body>
+  <div class="header">
+    <div class="logo">AGENTVERSE AI</div>
+    <div class="title">Payment Receipt</div>
+  </div>
+  <div class="badge">✓ Payment Successful</div>
+  <table>
+    <tr><td>Plan</td><td>${receipt.planName}</td></tr>
+    <tr><td>Date</td><td>${receipt.date}</td></tr>
+    <tr><td>Customer</td><td>${receipt.userName}</td></tr>
+    <tr><td>Email</td><td>${receipt.userEmail}</td></tr>
+    <tr><td>Payment ID</td><td>${receipt.paymentId}</td></tr>
+    <tr><td>Order ID</td><td>${receipt.orderId}</td></tr>
+    <tr class="amount-row"><td>Amount Paid</td><td>₹${receipt.amount.toLocaleString("en-IN")}</td></tr>
+  </table>
+  <div class="footer">
+    AgentVerse AI · agentverse-ai-web.vercel.app<br/>
+    This is a computer-generated receipt and does not require a signature.
+  </div>
+</body>
+</html>`;
+
+    const blob = new Blob([html], { type: "text/html" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `agentverse-receipt-${receipt.paymentId}.html`;
+    a.click();
+    URL.revokeObjectURL(url);
+  }
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 px-4">
+      <div className="w-full max-w-md border border-sky-200/20 bg-[#0a0f1a] p-8">
+        {/* Header */}
+        <div className="mb-6 text-center">
+          <div className="mb-3 flex h-12 w-12 items-center justify-center border border-sky-200/30 bg-sky-200/10 mx-auto">
+            <span className="text-2xl">✓</span>
+          </div>
+          <h2 className="font-[var(--font-pixel)] text-xl text-white">Payment Successful</h2>
+          <p className="mt-1 text-sm text-white/50">Your subscription is now active</p>
+        </div>
+
+        {/* Receipt lines */}
+        <div className="space-y-3 border border-white/10 p-4 text-sm">
+          <div className="flex justify-between">
+            <span className="text-white/50">Plan</span>
+            <span className="text-white font-medium">{receipt.planName}</span>
+          </div>
+          <div className="flex justify-between">
+            <span className="text-white/50">Date</span>
+            <span className="text-white">{receipt.date}</span>
+          </div>
+          <div className="flex justify-between">
+            <span className="text-white/50">Email</span>
+            <span className="text-white">{receipt.userEmail}</span>
+          </div>
+          <div className="flex justify-between">
+            <span className="text-white/50">Payment ID</span>
+            <span className="text-white/70 font-mono text-xs">{receipt.paymentId}</span>
+          </div>
+          <div className="flex justify-between">
+            <span className="text-white/50">Order ID</span>
+            <span className="text-white/70 font-mono text-xs">{receipt.orderId}</span>
+          </div>
+          <div className="flex justify-between border-t border-white/10 pt-3">
+            <span className="text-white font-semibold">Amount Paid</span>
+            <span className="text-sky-200 font-[var(--font-pixel)] text-lg">
+              ₹{receipt.amount.toLocaleString("en-IN")}
+            </span>
+          </div>
+        </div>
+
+        {/* Actions */}
+        <div className="mt-6 flex gap-3">
+          <button
+            onClick={downloadReceipt}
+            className="flex-1 border border-sky-200/40 bg-sky-200/10 py-2.5 text-sm text-sky-200 hover:bg-sky-200/20 transition"
+          >
+            ⬇ Download Receipt
+          </button>
+          <button
+            onClick={onClose}
+            className="flex-1 border border-white/15 py-2.5 text-sm text-white/70 hover:border-white/30 hover:text-white transition"
+          >
+            Done
+          </button>
+        </div>
+      </div>
+    </div>
+  );
 }
 
 function PlanCard({ plan, currentPlanId, onPay }: { plan: PricingPlan; currentPlanId?: string; onPay: (plan: PricingPlan) => void }) {
@@ -67,6 +192,7 @@ export default function PlansPage() {
   const [sub, setSub] = useState<Subscription | null | undefined>(undefined);
   const [status, setStatus] = useState<string | null>(null);
   const [paying, setPaying] = useState(false);
+  const [receipt, setReceipt] = useState<Receipt | null>(null);
 
   useEffect(() => {
     getMySubscription().then((r) => setSub(r.data)).catch(() => setSub(null));
@@ -80,6 +206,7 @@ export default function PlansPage() {
 
     if (!publicEnv.razorpayKeyId) {
       setStatus("Razorpay key not configured — add NEXT_PUBLIC_RAZORPAY_KEY_ID to Vercel env vars.");
+      setPaying(false);
       return;
     }
 
@@ -110,14 +237,25 @@ export default function PlansPage() {
               planId: plan.id,
               razorpayOrderId: response.razorpay_order_id,
               razorpayPaymentId: response.razorpay_payment_id,
-              razorpaySignature: response.razorpay_signature
+              razorpaySignature: response.razorpay_signature,
             });
-            setStatus("✅ Subscription activated!");
+            // Show receipt
+            setReceipt({
+              planName: plan.name,
+              amount: order.amount / 100,
+              currency: order.currency,
+              orderId: response.razorpay_order_id,
+              paymentId: response.razorpay_payment_id,
+              date: new Date().toLocaleDateString("en-IN", { year: "numeric", month: "long", day: "numeric" }),
+              userName: user.name,
+              userEmail: user.email,
+            });
+            setStatus(null);
             getMySubscription().then((r) => setSub(r.data)).catch(() => {});
           } catch {
             setStatus("Payment captured but verification failed — please contact support.");
           }
-        }
+        },
       });
       rzp.open();
       setStatus(null);
@@ -130,6 +268,8 @@ export default function PlansPage() {
 
   return (
     <main className="mx-auto max-w-6xl px-6 py-10">
+      {receipt && <ReceiptModal receipt={receipt} onClose={() => setReceipt(null)} />}
+
       <div className="mb-8">
         <p className="section-label">Billing</p>
         <h1 className="mt-2 font-[var(--font-pixel)] text-3xl text-white">Choose your plan</h1>

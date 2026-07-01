@@ -150,7 +150,6 @@ export default function PlansPage() {
             key={plan.id}
             plan={plan}
             currentPlanId={sub?.planId}
-            paying={paying}
             onPay={handlePay}
           />
         ))}

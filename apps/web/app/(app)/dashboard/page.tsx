@@ -40,7 +40,7 @@ function buildDailyChart(recentUsage: Array<{ createdAt: string }>): { day: stri
   }
   recentUsage.forEach(({ createdAt }) => {
     const key = new Date(createdAt).toISOString().slice(0, 10);
-    if (key in days) days[key]++;
+    if (key in days) days[key] = (days[key] ?? 0) + 1;
   });
   return Object.entries(days).map(([day, count]) => ({ day, count }));
 }

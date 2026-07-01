@@ -10,7 +10,8 @@ function Skeleton({ className }: { className?: string }) {
 
 async function loadJsPDF() {
   if (typeof window === "undefined") return null;
-  if ((window as unknown as Record<string, unknown>).jspdf) return (window as unknown as Record<string, { jsPDF: unknown }>).jspdf.jsPDF;
+  const w = window as unknown as Record<string, { jsPDF: unknown } | undefined>;
+  if (w.jspdf) return w.jspdf?.jsPDF ?? null;
   await new Promise<void>((resolve, reject) => {
     const s = document.createElement("script");
     s.src = "https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js";

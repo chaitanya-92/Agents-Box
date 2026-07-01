@@ -469,7 +469,7 @@ function PlansPageInner() {
     if (!user) { window.location.href = "/login"; return; }
 
     if (!publicEnv.razorpayKeyId) {
-      toast("Razorpay not configured. Add NEXT_PUBLIC_RAZORPAY_KEY_ID to Vercel.", "error");
+      toast("Payment is temporarily unavailable. Please contact support.", "error");
       setPaying(false);
       return;
     }
@@ -611,8 +611,7 @@ function PlansPageInner() {
 
       {!publicEnv.razorpayKeyId && (
         <p className="mt-8 text-center text-xs text-amber-300/70">
-          ⚠️ Razorpay not configured — add{" "}
-          <code className="text-amber-200">NEXT_PUBLIC_RAZORPAY_KEY_ID</code> to Vercel env vars.
+          ⚠️ Payment is temporarily unavailable. Please contact support.
         </p>
       )}
     </main>

@@ -53,14 +53,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
     const u = getCurrentUser();
     if (!u) { router.replace("/login"); return; }
     setUser(u);
-    // Check email verification from localStorage cache
-    try {
-      const raw = localStorage.getItem("agentverse.user");
-      if (raw) {
-        const parsed = JSON.parse(raw);
-        setEmailVerified(parsed.emailVerified ?? null);
-      }
-    } catch { /* ignore */ }
+    setEmailVerified(u.emailVerified ?? null);
     // Restore collapsed state
     const saved = localStorage.getItem(COLLAPSED_KEY);
     if (saved === "1") setCollapsed(true);

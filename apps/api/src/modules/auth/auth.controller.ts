@@ -272,13 +272,14 @@ export async function googleCallback(req: Request, res: Response, next: NextFunc
       data: { refreshToken: tokens.refreshToken, emailVerified: true }
     });
 
-    const redirectUrl = new URL("/dashboard", env.APP_URL);
+    const redirectUrl = new URL("/oauth/callback", env.APP_URL);
     redirectUrl.searchParams.set("accessToken", tokens.accessToken);
     redirectUrl.searchParams.set("refreshToken", tokens.refreshToken);
     redirectUrl.searchParams.set("id", oauthUser.id);
     redirectUrl.searchParams.set("name", oauthUser.name);
     redirectUrl.searchParams.set("email", oauthUser.email);
     redirectUrl.searchParams.set("role", oauthUser.role);
+    redirectUrl.searchParams.set("emailVerified", "true");
 
     return res.redirect(redirectUrl.toString());
   } catch (err) {

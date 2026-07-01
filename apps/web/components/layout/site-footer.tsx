@@ -10,7 +10,7 @@ export function SiteFooter() {
             <Link href="/terms" className="hover:text-white/80 transition">Terms of Service</Link>
             <Link href="/privacy" className="hover:text-white/80 transition">Privacy Policy</Link>
             <span className="hidden sm:inline text-white/20">|</span>
-            <span>Built with Next.js, Express, Prisma &amp; Razorpay.</span>
+            <span>© {new Date().getFullYear()} AgentVerse AI</span>
           </div>
         </div>
       </div>

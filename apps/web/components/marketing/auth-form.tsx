@@ -318,7 +318,7 @@ function RegisterFields() {
 
   return (
     <form onSubmit={handleRegister} className="mt-8 space-y-5">
-      <Field label="Full Name" value={name} onChange={setName} placeholder="Chaitanya" />
+      <Field label="Full Name" value={name} onChange={setName} placeholder="Your full name" />
       <Field label="Email" type="email" value={email} onChange={setEmail} placeholder="you@agentverse.ai" />
       <Field label="Password" type="password" value={password} onChange={setPassword} placeholder="At least 8 characters" />
       <Field label="Confirm Password" type="password" value={confirm} onChange={setConfirm} placeholder="Re-enter password" />

@@ -86,8 +86,8 @@ export default function AdminPage() {
   }
 
   const planBadge = (subs: AdminUser["subscriptions"]) => {
-    if (!subs.length) return <span className="text-xs text-white/25">—</span>;
     const s = subs[0];
+    if (!s) return <span className="text-xs text-white/25">—</span>;
     const color = s.status === "ACTIVE" ? "text-emerald-300 border-emerald-400/30 bg-emerald-400/10"
       : s.status === "TRIAL" ? "text-amber-300 border-amber-400/30 bg-amber-400/10"
       : "text-white/40 border-white/10 bg-white/5";

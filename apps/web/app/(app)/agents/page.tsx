@@ -26,7 +26,7 @@ export default function AgentsPage() {
   });
 
   return (
-    <main className="mx-auto max-w-6xl px-6 py-10">
+    <main className="mx-auto max-w-6xl px-4 sm:px-6 py-8 sm:py-10">
       <div className="mb-8">
         <p className="section-label">Marketplace</p>
         <h1 className="mt-2 font-[var(--font-pixel)] text-3xl text-white">Agent Catalog</h1>

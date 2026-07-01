@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { Press_Start_2P, Space_Grotesk } from "next/font/google";
 import type { ReactNode } from "react";
+import { ToastProvider } from "@/components/ui/toast";
 import "./globals.css";
 
 const pixelFont = Press_Start_2P({
@@ -27,7 +28,9 @@ export default function RootLayout({
   return (
     <html lang="en">
       <body className={`${pixelFont.variable} ${bodyFont.variable} font-[var(--font-body)]`}>
-        {children}
+        <ToastProvider>
+          {children}
+        </ToastProvider>
       </body>
     </html>
   );

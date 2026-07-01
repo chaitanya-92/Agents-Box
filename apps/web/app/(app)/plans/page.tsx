@@ -5,6 +5,7 @@ import { pricingPlans, type PricingPlan } from "@agentverse/config";
 import { createPricingOrder, getMySubscription, type Subscription, verifyPricingPayment } from "@/lib/api";
 import { getCurrentUser } from "@/lib/auth";
 import { publicEnv } from "@/lib/env";
+import { useToast } from "@/components/ui/toast";
 
 declare global {
   interface Window {
@@ -189,6 +190,7 @@ function PlanCard({ plan, currentPlanId, onPay }: { plan: PricingPlan; currentPl
 }
 
 export default function PlansPage() {
+  const { toast } = useToast();
   const [sub, setSub] = useState<Subscription | null | undefined>(undefined);
   const [status, setStatus] = useState<string | null>(null);
   const [paying, setPaying] = useState(false);
@@ -251,9 +253,11 @@ export default function PlansPage() {
               userEmail: user.email,
             });
             setStatus(null);
+            toast(`${plan.name} plan activated!`, "success");
             getMySubscription().then((r) => setSub(r.data)).catch(() => {});
           } catch {
-            setStatus("Payment captured but verification failed — please contact support.");
+            setStatus(null);
+            toast("Payment captured but verification failed — contact support.", "error");
           }
         },
       });
@@ -267,7 +271,7 @@ export default function PlansPage() {
   }
 
   return (
-    <main className="mx-auto max-w-6xl px-6 py-10">
+    <main className="mx-auto max-w-6xl px-4 sm:px-6 py-8 sm:py-10">
       {receipt && <ReceiptModal receipt={receipt} onClose={() => setReceipt(null)} />}
 
       <div className="mb-8">
@@ -284,7 +288,7 @@ export default function PlansPage() {
         </div>
       )}
 
-      <div className="grid gap-6 lg:grid-cols-3">
+      <div className="grid gap-4 sm:gap-6 sm:grid-cols-2 lg:grid-cols-3">
         {pricingPlans.map((plan) => (
           <PlanCard
             key={plan.id}

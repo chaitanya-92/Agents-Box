@@ -22,91 +22,160 @@ async function loadJsPDF() {
   return (window as unknown as Record<string, { jsPDF: unknown }>).jspdf?.jsPDF ?? null;
 }
 
+// Format amount — jsPDF built-in fonts don't support ₹, use "Rs." instead
+function fmtAmount(paise: number) {
+  return `Rs. ${(paise / 100).toLocaleString("en-IN", { minimumFractionDigits: 2 })}`;
+}
+
 function downloadInvoicePDF(invoice: Invoice, profile: UserProfile | null) {
   loadJsPDF().then((JsPDF) => {
     if (!JsPDF) return;
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const doc = new (JsPDF as any)({ unit: "mm", format: "a4" });
 
-    const bg = [8, 10, 13];
-    const accent = [186, 230, 255];
-    const muted = [100, 110, 130];
-    const white = [226, 232, 240];
+    // ── Palette (white bg, dark text) ────────────────────────────────────
+    const navy   = [15, 23, 42];    // header bg
+    const blue   = [14, 165, 233];  // accent
+    const dark   = [30, 41, 59];    // strong text
+    const grey   = [100, 116, 139]; // muted text
+    const light  = [241, 245, 249]; // zebra row bg
+    const green  = [22, 163, 74];   // PAID badge
 
-    doc.setFillColor(...bg);
-    doc.rect(0, 0, 210, 297, "F");
+    const pageW = 210;
+    const margin = 20;
 
-    doc.setFillColor(13, 20, 36);
-    doc.rect(0, 0, 210, 48, "F");
+    // White background
+    doc.setFillColor(255, 255, 255);
+    doc.rect(0, 0, pageW, 297, "F");
 
-    doc.setTextColor(...accent);
-    doc.setFontSize(16);
+    // ── Header bar ───────────────────────────────────────────────────────
+    doc.setFillColor(...navy);
+    doc.rect(0, 0, pageW, 42, "F");
+
+    doc.setTextColor(255, 255, 255);
     doc.setFont("helvetica", "bold");
-    doc.text("AGENTVERSE AI", 20, 22);
-
-    doc.setTextColor(...muted);
-    doc.setFontSize(8);
-    doc.setFont("helvetica", "normal");
-    doc.text("One Platform. Unlimited AI Agents.", 20, 30);
-    doc.text("INVOICE", 170, 22);
-
-    doc.setTextColor(...white);
     doc.setFontSize(18);
-    doc.setFont("helvetica", "bold");
-    doc.text("Payment Receipt", 20, 62);
+    doc.text("AgentVerse AI", margin, 18);
 
-    const date = new Date(invoice.createdAt).toLocaleDateString("en-IN", { day: "numeric", month: "long", year: "numeric" });
-    doc.setTextColor(...muted);
-    doc.setFontSize(9);
     doc.setFont("helvetica", "normal");
-    doc.text(date, 20, 70);
+    doc.setFontSize(8);
+    doc.setTextColor(148, 163, 184);
+    doc.text("One Platform. Unlimited AI Agents.", margin, 26);
 
+    // INVOICE label top-right
+    doc.setTextColor(255, 255, 255);
+    doc.setFont("helvetica", "bold");
+    doc.setFontSize(10);
+    doc.text("INVOICE", pageW - margin, 18, { align: "right" });
+
+    const date = new Date(invoice.createdAt).toLocaleDateString("en-IN", {
+      day: "numeric", month: "long", year: "numeric"
+    });
+    doc.setFont("helvetica", "normal");
+    doc.setFontSize(8);
+    doc.setTextColor(148, 163, 184);
+    doc.text(date, pageW - margin, 26, { align: "right" });
+
+    // ── Title ─────────────────────────────────────────────────────────────
+    doc.setTextColor(...dark);
+    doc.setFont("helvetica", "bold");
+    doc.setFontSize(20);
+    doc.text("Payment Receipt", margin, 60);
+
+    // Accent underline
+    doc.setDrawColor(...blue);
+    doc.setLineWidth(0.8);
+    doc.line(margin, 63, margin + 55, 63);
+
+    // ── Billed to ─────────────────────────────────────────────────────────
+    let y = 76;
     if (profile) {
-      doc.setTextColor(...white);
+      doc.setTextColor(...grey);
+      doc.setFont("helvetica", "normal");
+      doc.setFontSize(8);
+      doc.text("BILLED TO", margin, y);
+
+      doc.setTextColor(...dark);
+      doc.setFont("helvetica", "bold");
       doc.setFontSize(10);
-      doc.text(profile.name, 20, 84);
-      doc.setTextColor(...muted);
+      doc.text(profile.name, margin, y + 7);
+
+      doc.setFont("helvetica", "normal");
       doc.setFontSize(9);
-      doc.text(profile.email, 20, 90);
-      if (profile.phone) doc.text(profile.phone, 20, 96);
+      doc.setTextColor(...grey);
+      doc.text(profile.email, margin, y + 14);
+      if (profile.phone) doc.text(profile.phone, margin, y + 20);
+      y += 32;
     }
 
-    const rows = [
-      ["Subscription", `₹${invoice.amount.toLocaleString("en-IN")}`],
-      ["Payment ID", invoice.razorpayPaymentId ?? "—"],
-      ["Order ID", invoice.razorpayOrderId ?? "—"],
-      ["Date", date],
-      ["Status", "PAID"],
+    // ── Receipt table ─────────────────────────────────────────────────────
+    y += 4;
+    const rows: [string, string][] = [
+      ["Description", "Subscription — AgentVerse AI"],
+      ["Payment ID",  invoice.razorpayPaymentId ?? "—"],
+      ["Order ID",    invoice.razorpayOrderId ?? "—"],
+      ["Date",        date],
+      ["Status",      "PAID"],
     ];
 
-    let y = 110;
+    // Table header
+    doc.setFillColor(...navy);
+    doc.rect(margin, y, pageW - margin * 2, 9, "F");
+    doc.setTextColor(255, 255, 255);
+    doc.setFont("helvetica", "bold");
+    doc.setFontSize(8.5);
+    doc.text("FIELD", margin + 4, y + 6);
+    doc.text("DETAILS", pageW - margin - 4, y + 6, { align: "right" });
+    y += 9;
+
     rows.forEach(([label, value], i) => {
+      const rowH = 10;
+      // Zebra
       if (i % 2 === 0) {
-        doc.setFillColor(18, 26, 46);
-        doc.rect(20, y - 5, 170, 10, "F");
+        doc.setFillColor(...light);
+        doc.rect(margin, y, pageW - margin * 2, rowH, "F");
       }
-      doc.setTextColor(...muted);
-      doc.setFontSize(9);
-      doc.text(label, 25, y);
-      doc.setTextColor(...white);
-      doc.text(value, 140, y, { align: "right" });
-      y += 12;
+      doc.setTextColor(...grey);
+      doc.setFont("helvetica", "normal");
+      doc.setFontSize(8.5);
+      doc.text(label, margin + 4, y + 6.5);
+
+      // PAID badge in green
+      if (label === "Status") {
+        doc.setTextColor(...green);
+        doc.setFont("helvetica", "bold");
+      } else {
+        doc.setTextColor(...dark);
+        doc.setFont("helvetica", "normal");
+      }
+      doc.text(value, pageW - margin - 4, y + 6.5, { align: "right" });
+      y += rowH;
     });
 
-    doc.setDrawColor(...accent);
-    doc.setLineWidth(0.4);
-    doc.line(20, y + 2, 190, y + 2);
-
-    doc.setTextColor(...accent);
-    doc.setFontSize(11);
+    // ── Total box ─────────────────────────────────────────────────────────
+    y += 6;
+    doc.setFillColor(...blue);
+    doc.rect(margin, y, pageW - margin * 2, 14, "F");
+    doc.setTextColor(255, 255, 255);
     doc.setFont("helvetica", "bold");
-    doc.text(`Total: ₹${invoice.amount.toLocaleString("en-IN")}`, 190, y + 10, { align: "right" });
+    doc.setFontSize(12);
+    doc.text("TOTAL PAID", margin + 4, y + 9.5);
+    doc.setFontSize(13);
+    doc.text(fmtAmount(invoice.amount), pageW - margin - 4, y + 9.5, { align: "right" });
 
-    doc.setTextColor(...muted);
-    doc.setFontSize(8);
+    // ── Footer ────────────────────────────────────────────────────────────
+    doc.setDrawColor(...light);
+    doc.setLineWidth(0.5);
+    doc.line(margin, 272, pageW - margin, 272);
+
+    doc.setTextColor(...grey);
     doc.setFont("helvetica", "normal");
-    doc.text("Thank you for your business!", 20, 270);
-    doc.text("AgentVerse AI", 20, 276);
+    doc.setFontSize(8);
+    doc.text("Thank you for choosing AgentVerse AI.", margin, 279);
+    doc.text("For support: support@agentverse.ai", margin, 285);
+    doc.setFont("helvetica", "bold");
+    doc.setTextColor(...blue);
+    doc.text("agentverse.ai", pageW - margin, 285, { align: "right" });
 
     const filename = `agentverse_receipt_${invoice.razorpayPaymentId ?? invoice.id}.pdf`;
     doc.save(filename);

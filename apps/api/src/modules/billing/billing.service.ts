@@ -3,6 +3,7 @@ import Razorpay from "razorpay";
 import { pricingPlans } from "@agentverse/config";
 import { env } from "@/config/env";
 import { PAYMENT_STATUS, SUBSCRIPTION_STATUS } from "@/lib/domain-types";
+import { sendMail, buildWelcomeEmail } from "@/lib/mailer";
 import { prisma } from "@/lib/prisma";
 
 const razorpay = new Razorpay({
@@ -39,6 +40,8 @@ export function getPlanById(planId: string) {
 
 export async function verifyAndCapturePayment(input: {
   userId: string;
+  userEmail: string;
+  userName: string;
   razorpayOrderId: string;
   razorpayPaymentId: string;
   razorpaySignature: string;
@@ -86,6 +89,21 @@ export async function verifyAndCapturePayment(input: {
       currentPeriodEnd: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000)
     }
   });
+
+  // Send congratulation email (fire and forget)
+  const date = new Date().toLocaleDateString("en-IN", { year: "numeric", month: "long", day: "numeric" });
+  sendMail({
+    to: input.userEmail,
+    subject: `🎉 Welcome to AgentVerse AI — ${matchedPlan.name} activated!`,
+    html: buildWelcomeEmail({
+      name: input.userName,
+      planName: matchedPlan.name,
+      amount: (await prisma.payment.findUnique({ where: { razorpayOrderId: input.razorpayOrderId }, select: { amount: true } }))?.amount ?? 0,
+      paymentId: input.razorpayPaymentId,
+      orderId: input.razorpayOrderId,
+      date,
+    }),
+  }).catch(() => {});
 
   return subscription;
 }

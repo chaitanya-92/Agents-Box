@@ -2,7 +2,7 @@ import { publicEnv } from "@/lib/env";
 import { clearAuthSession, getAccessToken } from "@/lib/auth";
 
 type ApiEnvelope<T> = { success: boolean; message: string; data: T };
-type RequestOptions = { method?: "GET" | "POST"; body?: unknown; token?: string | null };
+type RequestOptions = { method?: "GET" | "POST" | "PATCH" | "DELETE"; body?: unknown; token?: string | null };
 
 async function request<T>(path: string, options: RequestOptions = {}) {
   const response = await fetch(`${publicEnv.apiUrl}${path}`, {
@@ -81,4 +81,22 @@ export function verifyPricingPayment(input: {
   razorpaySignature: string;
 }) {
   return request("/billing/verify-payment", { method: "POST", body: input, token: getAccessToken() });
+}
+
+export type UserProfile = {
+  id: string;
+  name: string;
+  email: string;
+  phone: string | null;
+  role: string;
+  avatarUrl: string | null;
+  createdAt: string;
+};
+
+export function getProfile() {
+  return request<UserProfile>("/users/me", { token: getAccessToken() });
+}
+
+export function updateProfile(input: { name?: string; email?: string; phone?: string }) {
+  return request<UserProfile>("/users/me", { method: "PATCH", body: input, token: getAccessToken() });
 }

@@ -3,6 +3,7 @@ import { agentRouter } from "@/routes/agent.routes";
 import { authRouter } from "@/routes/auth.routes";
 import { billingRouter } from "@/routes/billing.routes";
 import { subscriptionRouter } from "@/routes/subscription.routes";
+import { userRouter } from "@/routes/user.routes";
 
 export const apiRouter = Router();
 
@@ -14,6 +15,7 @@ apiRouter.get("/health", (_req, res) => {
 });
 
 apiRouter.use("/auth", authRouter);
+apiRouter.use("/users", userRouter);
 apiRouter.use("/agents", agentRouter);
 apiRouter.use("/billing", billingRouter);
 apiRouter.use("/subscriptions", subscriptionRouter);

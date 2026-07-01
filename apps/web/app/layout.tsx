@@ -17,7 +17,12 @@ const bodyFont = Space_Grotesk({
 
 export const metadata: Metadata = {
   title: "AgentVerse AI",
-  description: "One Platform. Unlimited AI Agents."
+  description: "One Platform. Unlimited AI Agents.",
+  icons: {
+    icon: "/icon.svg",
+    shortcut: "/icon.svg",
+    apple: "/icon.svg",
+  },
 };
 
 export default function RootLayout({

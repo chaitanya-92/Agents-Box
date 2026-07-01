@@ -9,6 +9,7 @@ import {
   verifyWebhookSignature
 } from "@/modules/billing/billing.service";
 import { createOrderSchema, verifyPaymentSchema } from "@/schemas/billing.schema";
+import { prisma } from "@/lib/prisma";
 
 export async function createOrder(req: Request, res: Response, next: NextFunction) {
   try {
@@ -35,7 +36,14 @@ export async function verifyPayment(req: Request, res: Response, next: NextFunct
   try {
     if (!req.user) return res.status(StatusCodes.UNAUTHORIZED).json(failure("Authentication required"));
     const payload = verifyPaymentSchema.parse(req.body);
-    const subscription = await verifyAndCapturePayment({ userId: req.user.id, ...payload });
+    // Fetch user name for email
+    const dbUser = await prisma.user.findUnique({ where: { id: req.user.id }, select: { name: true } });
+    const subscription = await verifyAndCapturePayment({
+      userId: req.user.id,
+      userEmail: req.user.email,
+      userName: dbUser?.name ?? req.user.email,
+      ...payload,
+    });
     return res.status(StatusCodes.OK).json(success(subscription, "Payment verified"));
   } catch (err) { next(err); }
 }

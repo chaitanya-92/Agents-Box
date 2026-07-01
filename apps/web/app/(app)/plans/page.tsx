@@ -10,6 +10,8 @@ import { useToast } from "@/components/ui/toast";
 declare global {
   interface Window {
     Razorpay?: new (options: Record<string, unknown>) => { open: () => void };
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    jspdf?: any;
   }
 }
 
@@ -35,95 +37,175 @@ async function loadRazorpay(): Promise<boolean> {
   });
 }
 
-function ReceiptModal({ receipt, onClose }: { receipt: Receipt; onClose: () => void }) {
-  function downloadReceipt() {
-    const html = `<!DOCTYPE html>
-<html>
-<head>
-  <meta charset="utf-8" />
-  <title>AgentVerse Payment Receipt</title>
-  <style>
-    body { font-family: 'Segoe UI', Arial, sans-serif; max-width: 600px; margin: 40px auto; color: #111; }
-    .header { border-bottom: 2px solid #0ea5e9; padding-bottom: 16px; margin-bottom: 24px; }
-    .logo { font-size: 22px; font-weight: 700; color: #0ea5e9; letter-spacing: 1px; }
-    .title { font-size: 14px; color: #555; margin-top: 4px; }
-    .badge { display: inline-block; background: #dcfce7; color: #16a34a; padding: 4px 12px; border-radius: 20px; font-size: 13px; font-weight: 600; margin-bottom: 20px; }
-    table { width: 100%; border-collapse: collapse; }
-    td { padding: 10px 0; border-bottom: 1px solid #eee; font-size: 14px; }
-    td:first-child { color: #666; }
-    td:last-child { text-align: right; font-weight: 500; }
-    .amount-row td { font-size: 18px; font-weight: 700; border-bottom: none; padding-top: 16px; }
-    .footer { margin-top: 32px; font-size: 12px; color: #999; text-align: center; }
-  </style>
-</head>
-<body>
-  <div class="header">
-    <div class="logo">AGENTVERSE AI</div>
-    <div class="title">Payment Receipt</div>
-  </div>
-  <div class="badge">✓ Payment Successful</div>
-  <table>
-    <tr><td>Plan</td><td>${receipt.planName}</td></tr>
-    <tr><td>Date</td><td>${receipt.date}</td></tr>
-    <tr><td>Customer</td><td>${receipt.userName}</td></tr>
-    <tr><td>Email</td><td>${receipt.userEmail}</td></tr>
-    <tr><td>Payment ID</td><td>${receipt.paymentId}</td></tr>
-    <tr><td>Order ID</td><td>${receipt.orderId}</td></tr>
-    <tr class="amount-row"><td>Amount Paid</td><td>₹${receipt.amount.toLocaleString("en-IN")}</td></tr>
-  </table>
-  <div class="footer">
-    AgentVerse AI · agentverse-ai-web.vercel.app<br/>
-    This is a computer-generated receipt and does not require a signature.
-  </div>
-</body>
-</html>`;
+async function loadJsPDF(): Promise<boolean> {
+  if (window.jspdf) return true;
+  return new Promise((resolve) => {
+    const s = document.createElement("script");
+    s.src = "https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js";
+    s.onload = () => resolve(true);
+    s.onerror = () => resolve(false);
+    document.body.appendChild(s);
+  });
+}
 
-    const blob = new Blob([html], { type: "text/html" });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement("a");
-    a.href = url;
-    a.download = `agentverse-receipt-${receipt.paymentId}.html`;
-    a.click();
-    URL.revokeObjectURL(url);
+async function downloadPDF(receipt: Receipt) {
+  const ok = await loadJsPDF();
+  if (!ok || !window.jspdf) {
+    // Fallback: print-to-PDF
+    window.print();
+    return;
+  }
+
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const { jsPDF } = window.jspdf as any;
+  const doc = new jsPDF({ unit: "mm", format: "a4" });
+
+  const W = 210;
+  const margin = 20;
+  let y = 20;
+
+  // Background
+  doc.setFillColor(13, 20, 36);
+  doc.rect(0, 0, W, 297, "F");
+
+  // Header stripe
+  doc.setFillColor(10, 25, 50);
+  doc.rect(0, 0, W, 40, "F");
+
+  // Logo
+  doc.setTextColor(186, 230, 255);
+  doc.setFontSize(16);
+  doc.setFont("helvetica", "bold");
+  doc.text("AGENTVERSE AI", margin, y + 8);
+
+  doc.setFontSize(8);
+  doc.setFont("helvetica", "normal");
+  doc.setTextColor(120, 140, 160);
+  doc.text("PAYMENT RECEIPT", margin, y + 16);
+
+  // Receipt ID (top right)
+  doc.setFontSize(7);
+  doc.setTextColor(100, 120, 140);
+  doc.text(`Receipt: ${receipt.paymentId.slice(-8).toUpperCase()}`, W - margin, y + 8, { align: "right" });
+  doc.text(receipt.date, W - margin, y + 15, { align: "right" });
+
+  y = 55;
+
+  // Success badge
+  doc.setFillColor(16, 185, 129, 15);
+  doc.setDrawColor(16, 185, 129);
+  doc.roundedRect(margin, y, 55, 9, 2, 2, "FD");
+  doc.setTextColor(52, 211, 153);
+  doc.setFontSize(8);
+  doc.setFont("helvetica", "bold");
+  doc.text("✓  PAYMENT SUCCESSFUL", margin + 4, y + 6);
+
+  y += 22;
+
+  // Plan box
+  doc.setFillColor(20, 35, 60);
+  doc.setDrawColor(50, 80, 120);
+  doc.rect(margin, y, W - margin * 2, 28, "FD");
+  doc.setTextColor(120, 160, 200);
+  doc.setFontSize(7);
+  doc.setFont("helvetica", "normal");
+  doc.text("ACTIVE PLAN", margin + 6, y + 9);
+  doc.setTextColor(186, 230, 255);
+  doc.setFontSize(18);
+  doc.setFont("helvetica", "bold");
+  doc.text(receipt.planName, margin + 6, y + 22);
+  doc.setTextColor(100, 200, 140);
+  doc.setFontSize(14);
+  doc.text(`Rs.${receipt.amount.toLocaleString("en-IN")}`, W - margin - 6, y + 22, { align: "right" });
+
+  y += 40;
+
+  // Receipt table
+  doc.setFontSize(7);
+  doc.setFont("helvetica", "normal");
+  doc.setTextColor(120, 140, 160);
+  doc.text("PAYMENT DETAILS", margin, y);
+  y += 6;
+
+  const rows = [
+    ["Customer Name",  receipt.userName],
+    ["Email Address",  receipt.userEmail],
+    ["Date",           receipt.date],
+    ["Plan",           receipt.planName],
+    ["Amount Paid",    `Rs.${receipt.amount.toLocaleString("en-IN")}`],
+    ["Payment ID",     receipt.paymentId],
+    ["Order ID",       receipt.orderId],
+  ];
+
+  rows.forEach(([label, value], i) => {
+    const bg = i % 2 === 0 ? [18, 28, 50] : [14, 22, 40];
+    doc.setFillColor(...bg as [number, number, number]);
+    doc.rect(margin, y, W - margin * 2, 9, "F");
+    doc.setTextColor(140, 160, 185);
+    doc.setFontSize(7.5);
+    doc.setFont("helvetica", "normal");
+    doc.text(label, margin + 4, y + 6);
+    doc.setTextColor(210, 220, 235);
+    doc.setFont("helvetica", i === 4 ? "bold" : "normal");
+    doc.text(value, W - margin - 4, y + 6, { align: "right" });
+    y += 9;
+  });
+
+  y += 16;
+
+  // Footer
+  doc.setDrawColor(40, 60, 90);
+  doc.line(margin, y, W - margin, y);
+  y += 8;
+  doc.setTextColor(80, 100, 130);
+  doc.setFontSize(7);
+  doc.setFont("helvetica", "normal");
+  doc.text("AgentVerse AI  ·  agentverse-ai-web.vercel.app", W / 2, y, { align: "center" });
+  doc.text("This is a computer-generated receipt and does not require a signature.", W / 2, y + 6, { align: "center" });
+
+  doc.save(`agentverse-receipt-${receipt.paymentId.slice(-8)}.pdf`);
+}
+
+function ReceiptModal({ receipt, onClose }: { receipt: Receipt; onClose: () => void }) {
+  const [downloading, setDownloading] = useState(false);
+
+  async function handleDownload() {
+    setDownloading(true);
+    await downloadPDF(receipt).catch(() => {});
+    setDownloading(false);
   }
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 px-4">
-      <div className="w-full max-w-md border border-sky-200/20 bg-[#0a0f1a] p-8">
-        {/* Header */}
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm px-4">
+      <div className="w-full max-w-md border border-sky-200/20 bg-[#0a0f1a] p-8 animate-fade-up">
+        {/* Success icon */}
         <div className="mb-6 text-center">
-          <div className="mb-3 flex h-12 w-12 items-center justify-center border border-sky-200/30 bg-sky-200/10 mx-auto">
-            <span className="text-2xl">✓</span>
+          <div className="mb-3 flex h-14 w-14 items-center justify-center border border-emerald-400/30 bg-emerald-400/10 mx-auto">
+            <svg width="24" height="24" fill="none" viewBox="0 0 24 24">
+              <path d="M20 6L9 17l-5-5" stroke="#34d399" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+            </svg>
           </div>
-          <h2 className="font-[var(--font-pixel)] text-xl text-white">Payment Successful</h2>
-          <p className="mt-1 text-sm text-white/50">Your subscription is now active</p>
+          <h2 className="font-[var(--font-pixel)] text-lg text-white">Payment Successful</h2>
+          <p className="mt-1 text-sm text-white/50">Your subscription is now active. A confirmation email has been sent.</p>
         </div>
 
         {/* Receipt lines */}
-        <div className="space-y-3 border border-white/10 p-4 text-sm">
-          <div className="flex justify-between">
-            <span className="text-white/50">Plan</span>
-            <span className="text-white font-medium">{receipt.planName}</span>
-          </div>
-          <div className="flex justify-between">
-            <span className="text-white/50">Date</span>
-            <span className="text-white">{receipt.date}</span>
-          </div>
-          <div className="flex justify-between">
-            <span className="text-white/50">Email</span>
-            <span className="text-white">{receipt.userEmail}</span>
-          </div>
-          <div className="flex justify-between">
-            <span className="text-white/50">Payment ID</span>
-            <span className="text-white/70 font-mono text-xs">{receipt.paymentId}</span>
-          </div>
-          <div className="flex justify-between">
-            <span className="text-white/50">Order ID</span>
-            <span className="text-white/70 font-mono text-xs">{receipt.orderId}</span>
-          </div>
-          <div className="flex justify-between border-t border-white/10 pt-3">
+        <div className="space-y-0 border border-white/10 text-sm overflow-hidden">
+          {[
+            ["Plan",       receipt.planName],
+            ["Date",       receipt.date],
+            ["Email",      receipt.userEmail],
+            ["Payment ID", receipt.paymentId],
+            ["Order ID",   receipt.orderId],
+          ].map(([label, value], i) => (
+            <div key={label} className={`flex justify-between px-4 py-3 ${i % 2 === 0 ? "bg-white/[0.02]" : ""}`}>
+              <span className="text-white/50 shrink-0">{label}</span>
+              <span className="text-white/80 font-mono text-xs text-right ml-4 truncate max-w-[55%]">{value}</span>
+            </div>
+          ))}
+          <div className="flex justify-between px-4 py-3 border-t border-white/10">
             <span className="text-white font-semibold">Amount Paid</span>
-            <span className="text-sky-200 font-[var(--font-pixel)] text-lg">
+            <span className="font-[var(--font-pixel)] text-base text-sky-200">
               ₹{receipt.amount.toLocaleString("en-IN")}
             </span>
           </div>
@@ -132,10 +214,15 @@ function ReceiptModal({ receipt, onClose }: { receipt: Receipt; onClose: () => v
         {/* Actions */}
         <div className="mt-6 flex gap-3">
           <button
-            onClick={downloadReceipt}
-            className="flex-1 border border-sky-200/40 bg-sky-200/10 py-2.5 text-sm text-sky-200 hover:bg-sky-200/20 transition"
+            onClick={handleDownload}
+            disabled={downloading}
+            className="flex-1 border border-sky-200/40 bg-sky-200/10 py-2.5 text-sm text-sky-200 hover:bg-sky-200/20 transition disabled:opacity-50 flex items-center justify-center gap-2"
           >
-            ⬇ Download Receipt
+            {downloading ? (
+              <><span className="h-3 w-3 border border-sky-200/40 border-t-sky-200 rounded-full animate-spin inline-block" /> Generating…</>
+            ) : (
+              <>⬇ Download PDF</>
+            )}
           </button>
           <button
             onClick={onClose}
@@ -152,14 +239,14 @@ function ReceiptModal({ receipt, onClose }: { receipt: Receipt; onClose: () => v
 function PlanCard({ plan, currentPlanId, onPay }: { plan: PricingPlan; currentPlanId?: string; onPay: (plan: PricingPlan) => void }) {
   const isCurrent = currentPlanId === plan.id;
   return (
-    <div className={`pixel-panel flex flex-col p-6 ${plan.highlighted ? "border-sky-100/25 shadow-glow" : ""}`}>
+    <div className={`pixel-panel flex flex-col p-5 sm:p-6 animate-fade-up ${plan.highlighted ? "border-sky-100/25 shadow-glow" : ""}`}>
       <div className="flex items-start justify-between">
         <div>
-          <p className="font-[var(--font-pixel)] text-lg text-white">{plan.name}</p>
+          <p className="font-[var(--font-pixel)] text-base sm:text-lg text-white">{plan.name}</p>
           {isCurrent && <span className="mt-1 inline-block border border-sky-200/30 px-2 py-0.5 text-[10px] text-sky-200">Current plan</span>}
         </div>
         <div className="text-right">
-          <p className="font-[var(--font-pixel)] text-2xl text-sky-200">₹{plan.monthlyPrice}</p>
+          <p className="font-[var(--font-pixel)] text-xl sm:text-2xl text-sky-200">₹{plan.monthlyPrice.toLocaleString("en-IN")}</p>
           <p className="text-[10px] uppercase tracking-widest text-white/35">/ month</p>
         </div>
       </div>
@@ -167,7 +254,7 @@ function PlanCard({ plan, currentPlanId, onPay }: { plan: PricingPlan; currentPl
       <div className="mt-5 space-y-2 flex-1">
         {plan.features.map((f) => (
           <div key={f} className="flex items-start gap-2 text-sm text-white/65">
-            <span className="mt-0.5 text-sky-200 text-xs">✓</span>
+            <span className="mt-0.5 text-sky-200 text-xs shrink-0">✓</span>
             {f}
           </div>
         ))}
@@ -207,7 +294,7 @@ export default function PlansPage() {
     if (!user) { window.location.href = "/login"; return; }
 
     if (!publicEnv.razorpayKeyId) {
-      setStatus("Razorpay key not configured — add NEXT_PUBLIC_RAZORPAY_KEY_ID to Vercel env vars.");
+      toast("Razorpay not configured. Add NEXT_PUBLIC_RAZORPAY_KEY_ID to Vercel.", "error");
       setPaying(false);
       return;
     }
@@ -215,7 +302,7 @@ export default function PlansPage() {
     setStatus("Opening checkout…");
     try {
       const loaded = await loadRazorpay();
-      if (!loaded || !window.Razorpay) throw new Error("Could not load Razorpay");
+      if (!loaded || !window.Razorpay) throw new Error("Could not load Razorpay checkout");
 
       const order = (await createPricingOrder(plan.id)).data;
 
@@ -241,7 +328,6 @@ export default function PlansPage() {
               razorpayPaymentId: response.razorpay_payment_id,
               razorpaySignature: response.razorpay_signature,
             });
-            // Show receipt
             setReceipt({
               planName: plan.name,
               amount: order.amount / 100,
@@ -265,7 +351,8 @@ export default function PlansPage() {
       setStatus(null);
       setPaying(false);
     } catch (err) {
-      setStatus(err instanceof Error ? err.message : "Checkout failed");
+      setStatus(null);
+      toast(err instanceof Error ? err.message : "Checkout failed", "error");
       setPaying(false);
     }
   }
@@ -276,14 +363,15 @@ export default function PlansPage() {
 
       <div className="mb-8">
         <p className="section-label">Billing</p>
-        <h1 className="mt-2 font-[var(--font-pixel)] text-3xl text-white">Choose your plan</h1>
+        <h1 className="mt-2 font-[var(--font-pixel)] text-2xl sm:text-3xl text-white">Choose your plan</h1>
         <p className="mt-2 text-sm text-white/55">
           Razorpay-powered billing. All plans include access to the AgentVerse API.
         </p>
       </div>
 
       {status && (
-        <div className="mb-6 border border-sky-200/20 bg-sky-200/[0.05] px-4 py-3 text-sm text-sky-200">
+        <div className="mb-6 border border-sky-200/20 bg-sky-200/[0.05] px-4 py-3 text-sm text-sky-200 flex items-center gap-3">
+          <span className="h-3 w-3 border border-sky-200/40 border-t-sky-200 rounded-full animate-spin shrink-0" />
           {status}
         </div>
       )}
@@ -301,8 +389,8 @@ export default function PlansPage() {
 
       {!publicEnv.razorpayKeyId && (
         <p className="mt-8 text-center text-xs text-amber-300/70">
-          ⚠️ Razorpay is in test mode — add your live key via{" "}
-          <code className="text-amber-200">NEXT_PUBLIC_RAZORPAY_KEY_ID</code> in Vercel.
+          ⚠️ Razorpay not configured — add{" "}
+          <code className="text-amber-200">NEXT_PUBLIC_RAZORPAY_KEY_ID</code> to Vercel env vars.
         </p>
       )}
     </main>
